@@ -21,11 +21,9 @@ const privateJson = (body: unknown, status = 200) =>
   });
 
 /**
- * Resolves the active store and authorises the caller.
+ * Resolves the active store and authorises the caller, for a write.
  *
- * Returns either a usable mode or the response to send back. When no store is
- * configured this is a 501, which the browser treats as "stay on this device"
- * rather than as an error worth retrying.
+ * Returns either a usable mode or the response to send back.
  */
 async function resolveStore(request: Request) {
   const status = storeStatus();
@@ -57,11 +55,22 @@ async function readBody(request: Request): Promise<{ value: unknown } | { respon
   }
 }
 
+/**
+ * Reports where this deployment keeps memos, and returns them when that is here.
+ *
+ * `mode` carries the answer rather than the status code: a deployment with no
+ * server store, and a client that has not supplied the sync passphrase, are both
+ * ordinary states a browser should not log as failed requests. A 500 still means
+ * a store that was supposed to work did not.
+ */
 export async function GET(request: Request) {
-  const store = await resolveStore(request);
-  if ("response" in store) return store.response;
+  const status = storeStatus();
+  if (status.mode === "disabled") return privateJson({ mode: "device", notes: null, detail: status.reason });
+
+  if (!(await tokenMatches(bearerToken(request)))) return privateJson({ mode: "locked", notes: null });
+
   try {
-    return privateJson({ notes: await listNotes(store.mode), mode: store.mode });
+    return privateJson({ mode: "server", notes: await listNotes(status.mode) });
   } catch (error) {
     console.error("Failed to load notes", error);
     return privateJson({ error: "Could not load notes" }, 500);

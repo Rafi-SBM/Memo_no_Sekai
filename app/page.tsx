@@ -2265,9 +2265,11 @@ export default function Home() {
             </button>
             <button
               className="avatar top-avatar"
-              onClick={() => notify("Account settings coming with Clerk")}
+              onClick={() => setSettingsOpen(true)}
+              title="Workspace settings"
+              aria-label="Open workspace settings"
             >
-              R
+              M
             </button>
           </div>
         </header>
@@ -2911,64 +2913,95 @@ export default function Home() {
         </div>
       )}
       {editorOpen && active && (
-        <label className="due-fab">
-          <CalendarClock size={14} />
-          <span>Due</span>
-          <input
-            type="date"
-            value={active.dueAt ? active.dueAt.slice(0, 10) : ""}
-            onChange={(e) =>
-              updateNote({
-                dueAt: e.currentTarget.value
-                  ? new Date(`${e.currentTarget.value}T12:00:00`).toISOString()
-                  : undefined,
-              })
-            }
-            onInput={(e) =>
-              updateNote({
-                dueAt: e.currentTarget.value
-                  ? new Date(`${e.currentTarget.value}T12:00:00`).toISOString()
-                  : undefined,
-              })
-            }
-            aria-label="Memo due date"
-          />
-        </label>
-      )}
-      {editorOpen && active && taskStats(active.content).total > 0 && (
-        <div
-          aria-label={`${taskStats(active.content).completed} of ${taskStats(active.content).total} tasks complete`}
-          style={{
-            position: "fixed",
-            zIndex: 31,
-            right: 310,
-            bottom: 28,
-            display: "flex",
-            alignItems: "center",
-            gap: 7,
-            height: 36,
-            padding: "0 10px",
-            border: "1px solid var(--line)",
-            borderRadius: 18,
-            background: "var(--surface)",
-            color: "var(--muted)",
-            boxShadow: "var(--shadow)",
-            font: "11px 'DM Mono', monospace",
-          }}
-        >
-          <Check size={14} />
-          {taskStats(active.content).completed}/{taskStats(active.content).total} done
+        <div className="editor-dock">
+          <div className="editor-history-fab" role="group" aria-label="Edit history">
+            <button onClick={undoEdit} aria-label="Undo edit" title="Undo edit">
+              <Undo2 size={16} />
+            </button>
+            <button onClick={redoEdit} aria-label="Redo edit" title="Redo edit">
+              <Redo2 size={16} />
+            </button>
+          </div>
+
+          <div className="editor-color-fab" role="group" aria-label="Memo color">
+            <span>Color</span>
+            {noteColors.map((color) => (
+              <button
+                key={color}
+                className={`color-dot ${color} ${active.color === color ? "active" : ""}`}
+                onClick={() => updateNote({ color })}
+                aria-label={`Set memo color ${color}`}
+                title={`Set memo color ${color}`}
+              >
+                <span aria-hidden="true" />
+              </button>
+            ))}
+          </div>
+
+          <label className="editor-folder-fab">
+            <Folder size={15} />
+            <span>Folder</span>
+            <select
+              aria-label="Memo folder"
+              value={active.folder || "inbox"}
+              onChange={(event) => updateNote({ folder: event.target.value })}
+            >
+              {folders.map((folder) => (
+                <option key={folder} value={folder}>
+                  {folder}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {taskStats(active.content).total > 0 && (
+            <div
+              aria-label={`${taskStats(active.content).completed} of ${taskStats(active.content).total} tasks complete`}
+              className="editor-task-pill"
+            >
+              <Check size={14} />
+              {taskStats(active.content).completed}/{taskStats(active.content).total} done
+            </div>
+          )}
+
+          <label className="due-fab">
+            <CalendarClock size={14} />
+            <span>Due</span>
+            <input
+              type="date"
+              value={active.dueAt ? active.dueAt.slice(0, 10) : ""}
+              onChange={(e) =>
+                updateNote({
+                  dueAt: e.currentTarget.value
+                    ? new Date(`${e.currentTarget.value}T12:00:00`).toISOString()
+                    : undefined,
+                })
+              }
+              onInput={(e) =>
+                updateNote({
+                  dueAt: e.currentTarget.value
+                    ? new Date(`${e.currentTarget.value}T12:00:00`).toISOString()
+                    : undefined,
+                })
+              }
+              aria-label="Memo due date"
+            />
+          </label>
+
+          <button className="editor-duplicate-fab" onClick={duplicateNote} title="Duplicate memo">
+            <Copy size={16} />
+            <span>Duplicate</span>
+          </button>
+
+          <button
+            className="editor-protect-fab"
+            onClick={requestProtection}
+            title={active.protected ? "Remove memo protection" : "Protect memo"}
+          >
+            {active.protected ? <Unlock size={16} /> : <Lock size={16} />}
+            <span>{active.protected ? "Protected" : "Protect"}</span>
+          </button>
         </div>
-      )}
-      {editorOpen && active && (
-        <button
-          className="editor-protect-fab"
-          onClick={requestProtection}
-          title={active.protected ? "Remove memo protection" : "Protect memo"}
-        >
-          {active.protected ? <Unlock size={16} /> : <Lock size={16} />}
-          <span>{active.protected ? "Protected" : "Protect"}</span>
-        </button>
       )}
       {historyOpen && (
         <div
@@ -3672,38 +3705,6 @@ export default function Home() {
           {toast}
         </div>
       )}
-      {editorOpen && active && (
-        <div className="editor-color-fab" role="group" aria-label="Memo color">
-          <span>Color</span>
-          {noteColors.map((color) => (
-            <button
-              key={color}
-              className={`color-dot ${color} ${active.color === color ? "active" : ""}`}
-              onClick={() => updateNote({ color })}
-              aria-label={`Set memo color ${color}`}
-              title={`Set memo color ${color}`}
-            >
-              <span aria-hidden="true" />
-            </button>
-          ))}
-        </div>
-      )}
-      {editorOpen && active && (
-        <div className="editor-history-fab" role="group" aria-label="Edit history">
-          <button onClick={undoEdit} aria-label="Undo edit" title="Undo edit">
-            <Undo2 size={16} />
-          </button>
-          <button onClick={redoEdit} aria-label="Redo edit" title="Redo edit">
-            <Redo2 size={16} />
-          </button>
-        </div>
-      )}
-      {editorOpen && active && (
-        <button className="editor-duplicate-fab" onClick={duplicateNote} title="Duplicate memo">
-          <Copy size={16} />
-          <span>Duplicate</span>
-        </button>
-      )}
       {templateOpen && (
         <div
           className="overlay command-overlay"
@@ -3761,23 +3762,6 @@ export default function Home() {
             </button>
           </section>
         </div>
-      )}
-      {editorOpen && active && (
-        <label className="editor-folder-fab">
-          <Folder size={15} />
-          <span>Folder</span>
-          <select
-            aria-label="Memo folder"
-            value={active.folder || "inbox"}
-            onChange={(event) => updateNote({ folder: event.target.value })}
-          >
-            {folders.map((folder) => (
-              <option key={folder} value={folder}>
-                {folder}
-              </option>
-            ))}
-          </select>
-        </label>
       )}
       <style jsx global>{`
         .calendar-view {
@@ -3986,10 +3970,6 @@ export default function Home() {
           font-weight: 600;
         }
         .due-fab {
-          position: fixed;
-          z-index: 31;
-          right: 150px;
-          bottom: 28px;
           display: flex;
           align-items: center;
           gap: 7px;
@@ -4020,8 +4000,6 @@ export default function Home() {
         }
         @media (max-width: 560px) {
           .due-fab {
-            right: 18px;
-            bottom: 62px;
           }
           .due-fab span {
             display: none;

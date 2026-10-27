@@ -33,17 +33,19 @@ function authHeaders(): HeadersInit {
   return passphrase ? { Authorization: `Bearer ${passphrase}` } : {};
 }
 
-/** Distinguishes a deliberate refusal from an unreachable server. */
-function classify(status: number): SyncTarget {
-  if (status === 501) return { kind: "device" };
-  if (status === 401) return { kind: "locked" };
-  return { kind: "server" };
-}
+const kinds: SyncTarget["kind"][] = ["server", "device", "locked"];
+
+const toTarget = (value: unknown): SyncTarget => ({
+  kind: kinds.includes(value as SyncTarget["kind"]) ? (value as SyncTarget["kind"]) : "device",
+});
 
 /**
- * Asks the server what it can do and, when it has a store, what it holds.
+ * Asks the server where this workspace belongs and, when the answer is "here",
+ * what it holds.
  *
- * `notes` is null whenever the caller should fall back to the device copy.
+ * `notes` is null whenever the caller should fall back to the device copy. A
+ * store that is simply not configured is reported in the body rather than as a
+ * failed request, so the normal case leaves nothing in the browser console.
  */
 export async function probeServer(signal?: AbortSignal): Promise<{
   target: SyncTarget;
@@ -51,16 +53,13 @@ export async function probeServer(signal?: AbortSignal): Promise<{
   reachable: boolean;
 }> {
   try {
-    const response = await fetch("/api/notes", {
-      headers: authHeaders(),
-      cache: "no-store",
-      signal,
-    });
-    if (!response.ok) return { target: classify(response.status), notes: null, reachable: true };
-    const payload = (await response.json()) as { notes?: Note[] };
-    return { target: { kind: "server" }, notes: payload.notes ?? [], reachable: true };
+    const response = await fetch("/api/notes", { headers: authHeaders(), cache: "no-store", signal });
+    if (!response.ok) return { target: { kind: "device" }, notes: null, reachable: true };
+    const payload = (await response.json()) as { notes?: Note[] | null; mode?: unknown };
+    const target = toTarget(payload.mode);
+    return { target, notes: target.kind === "server" ? (payload.notes ?? []) : null, reachable: true };
   } catch {
-    // Offline, or served as a static build with no API at all.
+    // Offline, or served without an API at all.
     return { target: { kind: "device" }, notes: null, reachable: false };
   }
 }

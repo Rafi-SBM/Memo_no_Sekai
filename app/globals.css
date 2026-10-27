@@ -933,10 +933,6 @@ kbd {
   opacity: 0.72;
 }
 .editor-protect-fab {
-  position: fixed;
-  z-index: 31;
-  right: 28px;
-  bottom: 28px;
   display: flex;
   align-items: center;
   gap: 7px;
@@ -955,10 +951,6 @@ kbd {
   transform: translateY(-1px);
 }
 .editor-duplicate-fab {
-  position: fixed;
-  z-index: 31;
-  right: 145px;
-  bottom: 28px;
   display: flex;
   align-items: center;
   gap: 7px;
@@ -1256,16 +1248,6 @@ kbd {
     grid-template-columns: 1fr;
   }
 }
-@media (max-width: 560px) {
-  .editor-protect-fab {
-    right: 18px;
-    bottom: 18px;
-  }
-  .editor-duplicate-fab {
-    right: 123px;
-    bottom: 18px;
-  }
-}
 .overlay {
   position: fixed;
   inset: 0;
@@ -1278,7 +1260,10 @@ kbd {
 }
 .editor-modal {
   width: min(920px, 100%);
-  height: min(760px, calc(100vh - 44px));
+  /* Shortened and lifted so the floating editor dock, which is pinned to the
+     bottom of the viewport, never covers the footer. */
+  height: min(760px, calc(100vh - 102px));
+  margin-bottom: 58px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1594,10 +1579,6 @@ kbd {
   order: 2;
 }
 .editor-folder-fab {
-  position: fixed;
-  z-index: 31;
-  right: 263px;
-  bottom: 28px;
   display: flex;
   align-items: center;
   gap: 7px;
@@ -1682,10 +1663,6 @@ kbd {
   line-height: 1.5;
 }
 @media (max-width: 560px) {
-  .editor-folder-fab {
-    right: 230px;
-    bottom: 18px;
-  }
   .editor-folder-fab > span {
     display: none;
   }
@@ -1694,18 +1671,8 @@ kbd {
   }
 }
 @media (max-width: 560px) {
-  .editor-color-fab {
-    right: 18px;
-    bottom: 62px;
-  }
   .editor-color-fab > span {
     display: none;
-  }
-}
-@media (max-width: 560px) {
-  .editor-history-fab {
-    right: 18px;
-    bottom: 108px;
   }
 }
 .skip-link {
@@ -1828,10 +1795,6 @@ kbd {
   color: #f09a8a;
 }
 .editor-color-fab {
-  position: fixed;
-  z-index: 31;
-  right: 395px;
-  bottom: 28px;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -1880,10 +1843,6 @@ kbd {
   border-color: var(--accent);
 }
 .editor-history-fab {
-  position: fixed;
-  z-index: 31;
-  right: 540px;
-  bottom: 28px;
   display: flex;
   align-items: center;
   gap: 2px;
@@ -2806,4 +2765,52 @@ kbd {
 /* Ordered list items in the memo preview sit alongside bullet items. */
 .editor-preview li.ordered-item {
   list-style: decimal;
+}
+
+/* ---------------------------------------------------------------- *
+ * Editor dock
+ *
+ * One row for every editor control. These used to be six separately
+ * pinned elements with hand-tuned right offsets, which collided as
+ * soon as any of them changed width.
+ * ---------------------------------------------------------------- */
+.editor-dock {
+  position: fixed;
+  right: 28px;
+  bottom: 28px;
+  z-index: 31;
+  display: flex;
+  flex-wrap: wrap-reverse;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100vw - 56px);
+  pointer-events: none;
+}
+.editor-dock > * {
+  pointer-events: auto;
+}
+.editor-task-pill {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  color: var(--muted);
+  box-shadow: var(--shadow);
+  font:
+    11px var(--font-mono),
+    monospace;
+}
+@media (max-width: 720px) {
+  .editor-dock {
+    right: 16px;
+    bottom: 16px;
+    left: 16px;
+    max-width: none;
+    gap: 6px;
+  }
 }
