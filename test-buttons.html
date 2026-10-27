@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Button Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f0f0f0;
+        }
+        .test-button {
+            padding: 12px 24px;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+        }
+        .test-button:hover {
+            background: #2563eb;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 10px;
+            background: white;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Button Click Test</h1>
+    <p>If you can click these buttons, the issue is with the main app. If not, it's a browser issue.</p>
+    
+    <button class="test-button" onclick="testClick(1)">Test Button 1</button>
+    <button class="test-button" onclick="testClick(2)">Test Button 2</button>
+    <button class="test-button" onclick="testClick(3)">Test Button 3</button>
+    
+    <div class="result" id="result">
+        Click a button to test...
+    </div>
+    
+    <hr>
+    
+    <h2>Main App Button Test</h2>
+    <a href="index.html" class="test-button" style="display: inline-block; text-decoration: none;">Go to Main App</a>
+    
+    <script>
+        function testClick(num) {
+            document.getElementById('result').innerHTML = `
+                <strong>SUCCESS!</strong> Button ${num} clicked at ${new Date().toLocaleTimeString()}<br>
+                Buttons are working correctly. The issue might be with the main app.
+            `;
+            document.getElementById('result').style.background = '#10b981';
+            document.getElementById('result').style.color = 'white';
+        }
+        
+        console.log('Test page loaded successfully');
+    </script>
+</body>
+</html>

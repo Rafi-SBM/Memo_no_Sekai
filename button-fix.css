@@ -1,0 +1,67 @@
+/* CRITICAL BUTTON FIX */
+
+/* Ensure all buttons are clickable and visible */
+button {
+    pointer-events: auto !important;
+    cursor: pointer !important;
+    position: relative !important;
+    z-index: 100 !important;
+}
+
+.btn-primary,
+.btn-secondary,
+.btn-compact,
+#newNoteBtn,
+.filter-btn,
+.template-btn,
+.header-btn {
+    pointer-events: auto !important;
+    cursor: pointer !important;
+    z-index: 100 !important;
+    display: flex !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+/* Fix sidebar buttons specifically */
+.quick-actions {
+    z-index: 100 !important;
+    position: relative !important;
+}
+
+.quick-actions button {
+    pointer-events: auto !important;
+    cursor: pointer !important;
+    z-index: 101 !important;
+}
+
+/* Ensure sidebar is not blocking */
+.sidebar {
+    z-index: 50 !important;
+    pointer-events: auto !important;
+}
+
+.sidebar-content {
+    z-index: 51 !important;
+    pointer-events: auto !important;
+}
+
+/* Fix any overlay issues */
+.modal-backdrop {
+    pointer-events: auto !important;
+}
+
+.modal-backdrop.show {
+    pointer-events: auto !important;
+}
+
+/* Ensure dropdowns work */
+.dropdown-menu {
+    pointer-events: auto !important;
+    z-index: 1000 !important;
+}
+
+.template-menu {
+    pointer-events: auto !important;
+    z-index: 1000 !important;
+}

@@ -1,0 +1,33 @@
+{
+  "name": "memo-no-sekai",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint app lib --max-warnings=0"
+  },
+  "dependencies": {
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "20.17.30",
+    "@types/pg": "^8.23.1",
+    "@types/react": "19.0.12",
+    "@types/react-dom": "19.0.4",
+    "better-sqlite3": "^13.0.3",
+    "lucide-react": "^0.468.0",
+    "next": "^15.2.4",
+    "pg": "^8.23.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "typescript": "^5.8.2"
+  },
+  "devDependencies": {
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.3.4",
+    "prettier": "^3.6.2"
+  },
+  "overrides": {
+    "postcss": "8.5.27"
+  }
+}

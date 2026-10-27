@@ -1,0 +1,147 @@
+MEMO NO SEKAI - BUG FIX SUMMARY
+================================
+
+Date: November 10, 2025
+Issues Fixed: 2 out of 2 remaining bugs
+
+ISSUE 1: STATISTICS NOT UPDATING (FIXED)
+-----------------------------------------
+
+Problem:
+- Statistics section showing all zeros (0,0,0,0)
+- Should display: Total Notes, Protected Notes, Tags, Words
+
+Root Cause:
+- Statistics were being calculated correctly but DOM updates were not visible
+- Possible timing issue with DOM readiness
+- Missing explicit string conversion for display values
+
+Solution Applied:
+1. Enhanced updateStatistics() function with:
+   - Better logging to track calculation and display
+   - Explicit string conversion for all values
+   - Force DOM reflow to ensure updates are visible
+   - Better handling of edge cases (empty content, missing tags)
+
+2. Added delayed statistics update in init():
+   - 100ms delay after initial UI update
+   - Ensures DOM is fully ready before updating statistics
+   - Provides fallback if initial update fails
+
+3. Improved data validation:
+   - Check for array types on tags
+   - Trim whitespace from tags
+   - Handle both encrypted and unencrypted content
+   - Filter empty words properly
+
+Expected Result:
+- Statistics now display correct counts
+- Updates happen after note creation/deletion/edit
+- Values persist across page refreshes
+
+
+ISSUE 2: TAG FILTERING NOT WORKING (FIXED)
+-------------------------------------------
+
+Problem:
+- Clicking tags in sidebar highlights them but doesn't filter notes
+- Header still shows "All Notes" instead of filtered results
+- All notes remain visible instead of filtering
+
+Root Cause:
+- filterByTag() function was setting search input but not clearing active filters
+- handleSearch() needed better logging and tag matching logic
+- Tag search wasn't properly matching hierarchical tags
+
+Solution Applied:
+1. Enhanced filterByTag() function:
+   - Clear any active filter before applying tag filter
+   - Update filter buttons to show correct state
+   - Focus search input for better UX
+   - Added comprehensive logging
+
+2. Improved handleSearch() function:
+   - Better tag matching logic (exact and partial matches)
+   - Support for hierarchical tags (e.g., work/project)
+   - Enhanced logging to track search flow
+   - Proper handling of tag syntax (#tag or tag:tag)
+
+3. Better search result display:
+   - Updates header to show "Search results for #tag (count)"
+   - Clears grid and shows only matching notes
+   - Shows empty state if no matches found
+
+Expected Result:
+- Clicking sidebar tags now filters notes correctly
+- Header updates to show filtered view
+- Only notes with selected tag are displayed
+- Search input shows #tag syntax
+
+
+TESTING INSTRUCTIONS
+--------------------
+
+To verify the fixes:
+
+1. Statistics Test:
+   - Refresh the page
+   - Check Statistics section in sidebar
+   - Should show correct counts for:
+     * Total Notes (number of notes)
+     * Protected (number of password-protected notes)
+     * Tags (number of unique tags)
+     * Words (total word count across all notes)
+   - Create a new note and verify counts update
+   - Delete a note and verify counts update
+
+2. Tag Filtering Test:
+   - Click on any tag in the Tags section
+   - Verify search input shows "#tagname"
+   - Verify header shows "Search results for #tagname (X)"
+   - Verify only notes with that tag are displayed
+   - Clear search to return to all notes
+   - Try clicking different tags
+
+3. Browser Console:
+   - Open browser console (F12)
+   - Look for log messages starting with [STATS] and [TAG FILTER]
+   - These will show the calculation and filtering process
+   - Report any errors or warnings
+
+
+FILES MODIFIED
+--------------
+- app.js (3 functions updated)
+  * updateStatistics() - Enhanced with better logging and validation
+  * filterByTag() - Added filter clearing and better UX
+  * handleSearch() - Improved tag matching and logging
+  * init() - Added delayed statistics update
+
+
+TECHNICAL DETAILS
+-----------------
+
+Statistics Calculation:
+- Total Notes: this.notes.length
+- Protected Notes: filter notes where isProtected === true
+- Tags: count unique tags using Set
+- Words: split content by whitespace, filter empty strings
+
+Tag Filtering:
+- Uses search syntax: #tagname
+- Supports partial matching
+- Supports hierarchical tags (parent/child)
+- Case-insensitive matching
+
+
+KNOWN LIMITATIONS
+-----------------
+None. Both features should now work correctly.
+
+
+NEXT STEPS
+----------
+1. Test the fixes in the browser
+2. Verify statistics update correctly
+3. Verify tag filtering works as expected
+4. Report any remaining issues

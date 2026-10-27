@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Memo no Sekai</title>
+    <link rel="icon" type="image/svg+xml" href="app.svg">
+    <link rel="manifest" href="manifest.json">
+    
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#3b82f6">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Memo no Sekai">
+    <link rel="apple-touch-icon" href="app.svg">
+    
+    <!-- External Dependencies -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode/1.5.3/qrcode.min.js"></script>
+    
+    <!-- Google APIs -->
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="https://accounts.google.com/gsi/client"></script>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="style.css?v=20251110-1200">
+    <link rel="stylesheet" href="button-fix.css?v=20251110-1200">
+</head>
+<body>
+    <!-- Main Application -->
+    <div id="app" class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-content">
+                <div class="header-left">
+                    <div class="app-logo">
+                        <img src="app.svg" alt="Logo" class="logo-icon">
+                        <h1 class="app-title">Memo no Sekai</h1>
+                    </div>
+                </div>
+                
+                <div class="header-center">
+                    <div class="search-container">
+                        <input type="text" id="globalSearch" class="search-input" placeholder="Search notes... (try: tag:work, content:meeting)">
+                        <button class="search-btn" id="searchBtn" aria-label="Search notes">
+                            <svg class="search-icon" viewBox="0 0 24 24">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <path d="m21 21-4.35-4.35"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="header-right">
+                    <button class="header-btn tooltip" id="helpBtn" data-tooltip="Help & Shortcuts (Ctrl+/)" aria-label="Help and shortcuts">
+                        <svg class="help-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                        </svg>
+                    </button>
+                    
+                    <button class="header-btn tooltip" id="commandPaletteBtn" data-tooltip="Command Palette (Ctrl+P)" aria-label="Open command palette">
+                        <svg class="command-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path d="M18 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3H6a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3h12a3 3 0 0 0 3-3 3 3 0 0 0-3-3z"></path>
+                        </svg>
+                    </button>
+                    
+                    <button class="header-btn tooltip" id="syncBtn" data-tooltip="Sync Notes" aria-label="Check sync status">
+                        <svg class="sync-icon" viewBox="0 0 24 24">
+                            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3"></path>
+                        </svg>
+                    </button>
+                    
+                    <div class="dropdown">
+                        <button class="header-btn dropdown-trigger" id="settingsBtn" title="Settings" aria-label="Open settings menu" aria-haspopup="true" aria-expanded="false">
+                            <svg class="settings-icon" viewBox="0 0 24 24">
+                                <circle cx="12" cy="12" r="3"></circle>
+                                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1 1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                            </svg>
+                        </button>
+                        <div class="dropdown-menu" id="settingsDropdown" role="menu">
+                            <button class="dropdown-item" id="setupSecurityQuestions" role="menuitem">
+                                <svg class="item-icon" viewBox="0 0 24 24">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <path d="M9,9h6v6H9z"></path>
+                                    <path d="M12 6v2"></path>
+                                    <path d="M12 16v2"></path>
+                                </svg>
+                                Security Questions
+                            </button>
+                            <button class="dropdown-item" id="forgotPassword" role="menuitem">
+                                <svg class="item-icon" viewBox="0 0 24 24">
+                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                                    <circle cx="12" cy="16" r="1"></circle>
+                                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                                </svg>
+                                Forgot Password
+                            </button>
+                            <button class="dropdown-item" id="importNotes" role="menuitem">
+                                <svg class="item-icon" viewBox="0 0 24 24">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                    <polyline points="14,2 14,8 20,8"></polyline>
+                                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                                    <polyline points="10,9 9,9 8,9"></polyline>
+                                </svg>
+                                Import Notes
+                            </button>
+                            <div class="dropdown-divider"></div>
+                            <button class="dropdown-item" id="analyticsBtn" role="menuitem">
+                                <svg class="item-icon" viewBox="0 0 24 24">
+                                    <path d="M3 3v18h18"></path>
+                                    <path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"></path>
+                                </svg>
+                                Analytics Dashboard
+                            </button>
+                            <button class="dropdown-item" id="workspaceBtn" role="menuitem">
+                                <svg class="item-icon" viewBox="0 0 24 24">
+                                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                                </svg>
+                                Workspace Manager
+                            </button>
+                            <button class="dropdown-item" id="collaborationBtn" role="menuitem">
+                                <svg class="item-icon" viewBox="0 0 24 24">
+                                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                    <circle cx="9" cy="7" r="4"></circle>
+                                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                                </svg>
+                                Collaboration
+                            </button>
+                            <button class="dropdown-item" id="exportNotes" role="menuitem">
+                                <svg class="item-icon" viewBox="0 0 24 24">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="7,10 12,15 17,10"></polyline>
+                                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                                </svg>
+                                Export Notes
+                            </button>
+                            <div class="dropdown-divider"></div>
+                            <button class="dropdown-item" id="themeToggle" role="menuitem" aria-pressed="false">
+                                <svg class="item-icon theme-icon" viewBox="0 0 24 24">
+                                    <circle cx="12" cy="12" r="5"></circle>
+                                    <line x1="12" y1="1" x2="12" y2="3"></line>
+                                    <line x1="12" y1="21" x2="12" y2="23"></line>
+                                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                                    <line x1="1" y1="12" x2="3" y2="12"></line>
+                                    <line x1="21" y1="12" x2="23" y2="12"></line>
+                                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                                </svg>
+                                <span class="theme-text">Dark Mode</span>
+                            </button>
+                            <button class="dropdown-item" id="customizeTheme" role="menuitem">
+                                <svg class="item-icon" viewBox="0 0 24 24">
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                    <path d="M12 1v6m0 6v6m11-7h-6m-6 0H1"></path>
+                                </svg>
+                                Customize Theme
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <div class="sidebar-content">
+                    <!-- Storage Status -->
+                    <div class="storage-status" id="storageStatus">
+                        <div class="storage-header">
+                            <h3>Storage</h3>
+                            <button class="btn-icon" id="storageSettings" title="Storage Settings" aria-label="Configure storage settings">
+                                <svg viewBox="0 0 24 24">
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1 1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="storage-info" id="storageInfo">
+                            <div class="storage-disconnected">
+                                <div class="storage-icon">
+                                    <svg viewBox="0 0 24 24">
+                                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                                    </svg>
+                                </div>
+                                <div class="storage-details">
+                                    <div class="storage-title">No Storage Connected</div>
+                                    <div class="storage-subtitle">Click to connect</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Quick Actions -->
+                    <div class="quick-actions" style="position: relative; z-index: 100;">
+                        <button class="btn-primary btn-compact" id="newNoteBtn" style="pointer-events: auto; cursor: pointer; z-index: 101;">
+                            <svg class="btn-icon" viewBox="0 0 24 24">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg>
+                            Add Memo
+                        </button>
+                    </div>
+
+                    <!-- Filters -->
+                    <div class="filters-section">
+                        <h3>Filters</h3>
+                        <div class="filter-buttons" role="radiogroup" aria-label="Filter notes">
+                            <button class="filter-btn active" data-filter="all" role="radio" aria-checked="true">All Notes</button>
+                            <button class="filter-btn" data-filter="protected" role="radio" aria-checked="false">Protected</button>
+                            <button class="filter-btn" data-filter="recent" role="radio" aria-checked="false">Recent</button>
+                            <button class="filter-btn" data-filter="favorites" role="radio" aria-checked="false">Favorites</button>
+                        </div>
+                    </div>
+
+                    <!-- Statistics -->
+                    <div class="stats-section">
+                        <h3>Statistics</h3>
+                        <div class="stats-grid" id="statsGrid">
+                            <div class="stat-item">
+                                <div class="stat-number" id="totalNotes">0</div>
+                                <div class="stat-label">Total Notes</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-number" id="protectedNotes">0</div>
+                                <div class="stat-label">Protected</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-number" id="totalTags">0</div>
+                                <div class="stat-label">Tags</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-number" id="totalWords">0</div>
+                                <div class="stat-label">Words</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tags -->
+                    <div class="tags-section">
+                        <h3>Tags</h3>
+                        <div class="tags-list" id="tagsList">
+                            <div class="tag-item">
+                                <span>work</span>
+                                <span class="tag-count">3</span>
+                            </div>
+                            <div class="tag-item">
+                                <span>personal</span>
+                                <span class="tag-count">5</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Content Area -->
+            <div class="content-area">
+                <!-- Notes Grid -->
+                <div class="notes-container">
+                    <div class="notes-header">
+                        <h2 id="notesTitle">All Notes</h2>
+                        <div class="notes-actions">
+                            <div class="view-toggle">
+                                <button class="view-btn active" data-view="grid" title="Grid View" aria-label="Switch to grid view" aria-pressed="true">
+                                    <svg viewBox="0 0 24 24">
+                                        <rect x="3" y="3" width="7" height="7"></rect>
+                                        <rect x="14" y="3" width="7" height="7"></rect>
+                                        <rect x="14" y="14" width="7" height="7"></rect>
+                                        <rect x="3" y="14" width="7" height="7"></rect>
+                                    </svg>
+                                </button>
+                                <button class="view-btn" data-view="list" title="List View" aria-label="Switch to list view" aria-pressed="false">
+                                    <svg viewBox="0 0 24 24">
+                                        <line x1="8" y1="6" x2="21" y2="6"></line>
+                                        <line x1="8" y1="12" x2="21" y2="12"></line>
+                                        <line x1="8" y1="18" x2="21" y2="18"></line>
+                                        <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                                        <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                                        <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                                    </svg>
+                                </button>
+                            </div>
+                            <button class="btn-secondary" id="sortBtn">
+                                <svg class="btn-icon" viewBox="0 0 24 24">
+                                    <path d="M3 6h18M7 12h10m-7 6h4"></path>
+                                </svg>
+                                Sort
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="notes-grid" id="notesGrid">
+                        <!-- Notes will be dynamically loaded here -->
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <div id="modalsContainer">
+        <!-- Note Editor Modal -->
+        <div class="modal" id="noteEditorModal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content modal-large">
+                <div class="modal-header">
+                    <h2 id="editorTitle">Create Note</h2>
+                    <button class="modal-close" id="closeEditor" aria-label="Close">
+                        <svg viewBox="0 0 24 24">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form id="noteForm" class="note-form">
+                        <div class="form-group">
+                            <input type="text" id="noteTitle" class="form-input" placeholder="Note title..." required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <div class="editor-container">
+                                <div class="editor-tabs">
+                                    <button type="button" class="editor-tab active" data-tab="write">Write</button>
+                                    <button type="button" class="editor-tab" data-tab="preview">Preview</button>
+                                </div>
+                                <div class="editor-content">
+                                    <textarea id="noteContent" class="form-textarea" placeholder="Start writing your note... (Markdown supported)" required></textarea>
+                                    <div id="markdownPreview" class="markdown-preview" style="display: none;"></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group flex-1">
+                                <input type="text" id="noteTags" class="form-input" placeholder="Tags (comma separated)">
+                            </div>
+                            <div class="form-group">
+                                <label class="toggle-switch" for="passwordProtect">
+                                    <input type="checkbox" id="passwordProtect" aria-describedby="passwordHelp">
+                                    <span class="toggle-slider"></span>
+                                    <span class="toggle-label">Password Protect</span>
+                                </label>
+                                <div id="passwordHelp" class="sr-only">Enable password protection to encrypt this note</div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group password-group" id="passwordGroup" style="display: none;">
+                            <div class="password-input-container">
+                                <input type="password" id="notePassword" class="form-input" placeholder="Enter password">
+                                <button type="button" class="password-toggle" id="passwordToggle" aria-label="Toggle password visibility">
+                                    <svg class="eye-open" viewBox="0 0 24 24">
+                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                        <circle cx="12" cy="12" r="3"></circle>
+                                    </svg>
+                                    <svg class="eye-closed" viewBox="0 0 24 24" style="display: none;">
+                                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                                        <line x1="1" y1="1" x2="23" y2="23"></line>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" id="cancelNote">Cancel</button>
+                    <button type="submit" form="noteForm" class="btn-primary" id="saveNote">
+                        <span class="btn-text">Save Note</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Password Unlock Modal -->
+        <div class="modal" id="passwordUnlockModal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Unlock Protected Note</h2>
+                    <button class="modal-close" id="closePasswordModal" aria-label="Close">
+                        <svg viewBox="0 0 24 24">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form id="unlockForm">
+                        <div class="form-group">
+                            <label for="unlockPassword">Enter password to unlock this note:</label>
+                            <div class="password-input-container">
+                                <input type="password" id="unlockPassword" class="form-input" placeholder="Password" required>
+                                <button type="button" class="password-toggle" id="unlockPasswordToggle" aria-label="Toggle password visibility">
+                                    <svg class="eye-open" viewBox="0 0 24 24">
+                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                        <circle cx="12" cy="12" r="3"></circle>
+                                    </svg>
+                                    <svg class="eye-closed" viewBox="0 0 24 24" style="display: none;">
+                                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                                        <line x1="1" y1="1" x2="23" y2="23"></line>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" id="cancelUnlock">Cancel</button>
+                    <button type="submit" form="unlockForm" class="btn-primary" id="confirmUnlock">
+                        <span class="btn-text">Unlock</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Security Questions Setup Modal -->
+        <div class="modal" id="securityQuestionsModal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content modal-large">
+                <div class="modal-header">
+                    <h2>Setup Security Questions</h2>
+                    <button class="modal-close" id="closeSecurityModal" aria-label="Close">
+                        <svg viewBox="0 0 24 24">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <p class="security-intro">Set up 3-5 security questions to help recover your account if you forget your password.</p>
+                    
+                    <div class="questions-container" id="questionsContainer">
+                        <!-- Questions will be added dynamically -->
+                    </div>
+                    
+                    <div class="question-controls">
+                        <button class="btn-secondary" id="addQuestion">Add Question</button>
+                        <span class="question-count">Questions: <span id="questionCount">0</span>/5</span>
+                    </div>
+                    
+                    <div class="predefined-questions">
+                        <h4>Suggested Questions:</h4>
+                        <div class="suggested-list">
+                            <button class="suggested-question" data-question="What was the name of your first pet?">What was the name of your first pet?</button>
+                            <button class="suggested-question" data-question="What city were you born in?">What city were you born in?</button>
+                            <button class="suggested-question" data-question="What was your childhood nickname?">What was your childhood nickname?</button>
+                            <button class="suggested-question" data-question="What was the make of your first car?">What was the make of your first car?</button>
+                            <button class="suggested-question" data-question="What was the name of your elementary school?">What was the name of your elementary school?</button>
+                            <button class="suggested-question" data-question="What is your mother's maiden name?">What is your mother's maiden name?</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" id="cancelSecurity">Cancel</button>
+                    <button type="button" class="btn-primary" id="saveSecurity">Save Questions</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- QR Code Modal -->
+        <div class="modal" id="qrCodeModal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Share Note via QR Code</h2>
+                    <button class="modal-close" id="closeQrModal" aria-label="Close">
+                        <svg viewBox="0 0 24 24">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="qr-container">
+                        <canvas id="qrCanvas"></canvas>
+                        <p class="qr-description">Scan this QR code to import this note on another device</p>
+                        <button class="btn-secondary" id="downloadQr">Download QR Code</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Theme Customization Modal -->
+        <div class="modal" id="themeCustomizationModal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Customize Theme</h2>
+                    <button class="modal-close" id="closeThemeModal" aria-label="Close">
+                        <svg viewBox="0 0 24 24">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="theme-options">
+                        <div class="theme-section">
+                            <h4>Accent Color</h4>
+                            <div class="color-picker-grid">
+                                <button class="color-option" data-color="#3b82f6" style="background-color: #3b82f6;" title="Blue (Default)"></button>
+                                <button class="color-option" data-color="#10b981" style="background-color: #10b981;" title="Green"></button>
+                                <button class="color-option" data-color="#f59e0b" style="background-color: #f59e0b;" title="Orange"></button>
+                                <button class="color-option" data-color="#ef4444" style="background-color: #ef4444;" title="Red"></button>
+                                <button class="color-option" data-color="#8b5cf6" style="background-color: #8b5cf6;" title="Purple"></button>
+                                <button class="color-option" data-color="#06b6d4" style="background-color: #06b6d4;" title="Cyan"></button>
+                                <button class="color-option" data-color="#84cc16" style="background-color: #84cc16;" title="Lime"></button>
+                                <button class="color-option" data-color="#f97316" style="background-color: #f97316;" title="Orange"></button>
+                            </div>
+                        </div>
+                        
+                        <div class="theme-section">
+                            <h4>Font Size</h4>
+                            <div class="font-size-options">
+                                <button class="font-size-btn" data-size="small">Small</button>
+                                <button class="font-size-btn active" data-size="medium">Medium</button>
+                                <button class="font-size-btn" data-size="large">Large</button>
+                            </div>
+                        </div>
+                        
+                        <div class="theme-section">
+                            <h4>Density</h4>
+                            <div class="density-options">
+                                <button class="density-btn" data-density="compact">Compact</button>
+                                <button class="density-btn active" data-density="comfortable">Comfortable</button>
+                                <button class="density-btn" data-density="spacious">Spacious</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" id="resetTheme">Reset to Default</button>
+                    <button type="button" class="btn-primary" id="saveTheme">Save Theme</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Storage Selection Modal -->
+        <div class="modal" id="storageModal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Choose Storage Type</h2>
+                    <button class="modal-close" id="closeStorageModal" aria-label="Close">
+                        <svg viewBox="0 0 24 24">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="storage-options">
+                        <button class="storage-option" data-storage="local" role="button" aria-describedby="local-desc">
+                            <div class="storage-icon">
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                    <polyline points="14,2 14,8 20,8"></polyline>
+                                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                                </svg>
+                            </div>
+                            <div class="storage-info">
+                                <h3>Local File System</h3>
+                                <p id="local-desc">Choose a folder on your device for organized note storage with date-based folders</p>
+                            </div>
+                        </button>
+                        
+                        <button class="storage-option" data-storage="cloud" role="button" aria-describedby="cloud-desc">
+                            <div class="storage-icon">
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path>
+                                </svg>
+                            </div>
+                            <div class="storage-info">
+                                <h3>Google Drive</h3>
+                                <p id="cloud-desc">Auto-sync to Google Drive with "Memo no Sekai" folder and date organization</p>
+                            </div>
+                        </button>
+                        
+                        <button class="storage-option" data-storage="cache" role="button" aria-describedby="cache-desc">
+                            <div class="storage-icon">
+                                <svg viewBox="0 0 24 24">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                                </svg>
+                            </div>
+                            <div class="storage-info">
+                                <h3>Browser Cache</h3>
+                                <p id="cache-desc">Temporary session storage (data cleared when browser closes)</p>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Analytics Dashboard Modal -->
+        <div class="modal" id="analyticsModal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content modal-large">
+                <div class="modal-header">
+                    <h2>Analytics Dashboard</h2>
+                    <button class="modal-close" id="closeAnalyticsModal" aria-label="Close">
+                        <svg viewBox="0 0 24 24">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="analytics-dashboard">
+                        <div class="analytics-grid">
+                            <div class="analytics-card">
+                                <h3>📊 Overview</h3>
+                                <div class="stat-row">
+                                    <span>Total Notes:</span>
+                                    <span id="totalNotesCount">0</span>
+                                </div>
+                                <div class="stat-row">
+                                    <span>Total Words:</span>
+                                    <span id="totalWordsCount">0</span>
+                                </div>
+                                <div class="stat-row">
+                                    <span>Average Note Length:</span>
+                                    <span id="avgNoteLength">0</span>
+                                </div>
+                                <div class="stat-row">
+                                    <span>Most Active Day:</span>
+                                    <span id="mostActiveDay">-</span>
+                                </div>
+                            </div>
+                            
+                            <div class="analytics-card">
+                                <h3>🏷️ Tag Analytics</h3>
+                                <div id="tagAnalytics" class="tag-stats">
+                                    <!-- Tag statistics will be populated here -->
+                                </div>
+                            </div>
+                            
+                            <div class="analytics-card">
+                                <h3>📈 Activity Timeline</h3>
+                                <canvas id="activityChart" width="300" height="200"></canvas>
+                            </div>
+                            
+                            <div class="analytics-card">
+                                <h3>🔍 Search Insights</h3>
+                                <div class="stat-row">
+                                    <span>Most Searched Terms:</span>
+                                    <div id="topSearchTerms" class="search-terms">
+                                        <!-- Top search terms will be populated here -->
+                                    </div>
+                                </div>
+                                <div class="stat-row">
+                                    <span>Search Performance:</span>
+                                    <span id="avgSearchTime">0ms</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="analytics-actions">
+                            <button class="btn-secondary" id="exportAnalytics">Export Report</button>
+                            <button class="btn-primary" id="refreshAnalytics">Refresh Data</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Workspace Manager Modal -->
+        <div class="modal" id="workspaceModal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content modal-large">
+                <div class="modal-header">
+                    <h2>Workspace Manager</h2>
+                    <button class="modal-close" id="closeWorkspaceModal" aria-label="Close">
+                        <svg viewBox="0 0 24 24">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="workspace-manager">
+                        <div class="workspace-section">
+                            <h3>📁 Current Workspace</h3>
+                            <div class="workspace-info">
+                                <div class="workspace-card active">
+                                    <div class="workspace-header">
+                                        <span class="workspace-name" id="currentWorkspaceName">Default Workspace</span>
+                                        <span class="workspace-badge">Active</span>
+                                    </div>
+                                    <div class="workspace-stats">
+                                        <span id="workspaceNoteCount">0 notes</span>
+                                        <span id="workspaceSize">0 KB</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="workspace-section">
+                            <h3>🔧 Workspace Actions</h3>
+                            <div class="workspace-actions">
+                                <button class="workspace-action-btn" id="createWorkspace">
+                                    <svg viewBox="0 0 24 24">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <line x1="12" y1="8" x2="12" y2="16"></line>
+                                        <line x1="8" y1="12" x2="16" y2="12"></line>
+                                    </svg>
+                                    Create New Workspace
+                                </button>
+                                <button class="workspace-action-btn" id="duplicateWorkspace">
+                                    <svg viewBox="0 0 24 24">
+                                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                    </svg>
+                                    Duplicate Workspace
+                                </button>
+                                <button class="workspace-action-btn" id="archiveWorkspace">
+                                    <svg viewBox="0 0 24 24">
+                                        <polyline points="21,8 21,21 3,21 3,8"></polyline>
+                                        <rect x="1" y="3" width="22" height="5"></rect>
+                                        <line x1="10" y1="12" x2="14" y2="12"></line>
+                                    </svg>
+                                    Archive Workspace
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="workspace-section">
+                            <h3>📊 Workspace Analytics</h3>
+                            <div class="workspace-analytics">
+                                <div class="analytics-metric">
+                                    <span class="metric-label">Storage Used:</span>
+                                    <span class="metric-value" id="storageUsed">0 KB</span>
+                                </div>
+                                <div class="analytics-metric">
+                                    <span class="metric-label">Last Modified:</span>
+                                    <span class="metric-value" id="lastModified">Never</span>
+                                </div>
+                                <div class="analytics-metric">
+                                    <span class="metric-label">Backup Status:</span>
+                                    <span class="metric-value" id="backupStatus">Up to date</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" id="exportWorkspace">Export Workspace</button>
+                    <button type="button" class="btn-primary" id="saveWorkspaceSettings">Save Settings</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Collaboration Modal -->
+        <div class="modal" id="collaborationModal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content modal-large">
+                <div class="modal-header">
+                    <h2>Collaboration Center</h2>
+                    <button class="modal-close" id="closeCollaborationModal" aria-label="Close">
+                        <svg viewBox="0 0 24 24">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="collaboration-center">
+                        <div class="collab-section">
+                            <h3>🔗 Share Notes</h3>
+                            <div class="share-options">
+                                <button class="share-option" id="shareViaLink">
+                                    <svg viewBox="0 0 24 24">
+                                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                                    </svg>
+                                    Generate Share Link
+                                </button>
+                                <button class="share-option" id="shareViaEmail">
+                                    <svg viewBox="0 0 24 24">
+                                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                                        <polyline points="22,6 12,13 2,6"></polyline>
+                                    </svg>
+                                    Share via Email
+                                </button>
+                                <button class="share-option" id="shareViaQR">
+                                    <svg viewBox="0 0 24 24">
+                                        <rect x="3" y="3" width="5" height="5"></rect>
+                                        <rect x="16" y="3" width="5" height="5"></rect>
+                                        <rect x="3" y="16" width="5" height="5"></rect>
+                                        <path d="M21 16h-3a2 2 0 0 0-2 2v3"></path>
+                                        <path d="M21 21v.01"></path>
+                                        <path d="M12 7v3a2 2 0 0 1-2 2H7"></path>
+                                        <path d="M3 12h.01"></path>
+                                        <path d="M12 3h.01"></path>
+                                        <path d="M12 16v.01"></path>
+                                        <path d="M16 12h1"></path>
+                                        <path d="M21 12v.01"></path>
+                                        <path d="M12 21v-1"></path>
+                                    </svg>
+                                    QR Code Share
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="collab-section">
+                            <h3>👥 Team Features</h3>
+                            <div class="team-features">
+                                <div class="feature-card">
+                                    <h4>Real-time Collaboration</h4>
+                                    <p>Enable real-time editing and commenting on shared notes</p>
+                                    <button class="btn-secondary" id="enableRealTime">Enable</button>
+                                </div>
+                                <div class="feature-card">
+                                    <h4>Version History</h4>
+                                    <p>Track changes and restore previous versions of notes</p>
+                                    <button class="btn-secondary" id="viewVersions">View History</button>
+                                </div>
+                                <div class="feature-card">
+                                    <h4>Team Workspace</h4>
+                                    <p>Create shared workspaces for team collaboration</p>
+                                    <button class="btn-secondary" id="createTeamWorkspace">Create</button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="collab-section">
+                            <h3>🔒 Permission Management</h3>
+                            <div class="permissions-panel">
+                                <div class="permission-row">
+                                    <span>Public Sharing:</span>
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="publicSharing">
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="permission-row">
+                                    <span>Allow Comments:</span>
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="allowComments">
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="permission-row">
+                                    <span>Download Allowed:</span>
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="allowDownload">
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" id="collaborationHelp">Help & Tutorials</button>
+                    <button type="button" class="btn-primary" id="saveCollabSettings">Save Settings</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Preview Panel -->
+    <div id="quickPreviewPanel" class="quick-preview-panel">
+        <div class="preview-header">
+            <h3 id="previewTitle">Note Preview</h3>
+            <button class="preview-close" id="closePreview" aria-label="Close preview">
+                <svg viewBox="0 0 24 24">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+        </div>
+        <div class="preview-content" id="previewContent">
+            <p>Hover over a note to see its preview</p>
+        </div>
+        <div class="preview-footer">
+            <div class="preview-tags" id="previewTags"></div>
+            <div class="preview-date" id="previewDate"></div>
+        </div>
+    </div>
+
+    <!-- Performance Indicator -->
+    <div id="performanceIndicator" class="performance-indicator">
+        <div>Notes: <span id="perfNotesCount">0</span></div>
+        <div>Search: <span id="perfSearchTime">0ms</span></div>
+        <div>Render: <span id="perfRenderTime">0ms</span></div>
+    </div>
+
+    <!-- Notifications -->
+    <div id="notificationsContainer" class="notifications-container" aria-live="polite" aria-atomic="true"></div>
+
+    <!-- Scripts -->
+    <script src="app.js?v=20251110-1200"></script>
+    
+    <!-- Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('/service-worker.js')
+                    .then(function(registration) {
+                        console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                    }, function(err) {
+                        console.log('ServiceWorker registration failed: ', err);
+                    });
+            });
+        }
+    </script>
+</body>
+</html>
