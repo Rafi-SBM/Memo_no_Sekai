@@ -153,6 +153,7 @@ export default function Home() {
   const [storageNotice, setStorageNotice] = useState("");
   const [storageUsage, setStorageUsage] = useState<{ usage: number; quota: number } | null>(null);
   const [passphraseInput, setPassphraseInput] = useState("");
+  const [modKey, setModKey] = useState("Ctrl");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const [connectionsOpen, setConnectionsOpen] = useState(false);
@@ -229,6 +230,7 @@ export default function Home() {
     setAccent(readPref("memo-accent") || defaultAccent);
     setCompact(readPref("memo-density") === "compact");
     setPassphraseInput(readPassphrase());
+    if (/mac|iphone|ipad|ipod/i.test(navigator.userAgent)) setModKey("\u2318");
 
     /**
      * Works out where this workspace lives, then opens it.
@@ -1652,7 +1654,7 @@ export default function Home() {
       id: "new",
       label: "New memo",
       hint: "Capture a thought",
-      shortcut: "⌘ N",
+      shortcut: `${modKey} N`,
       icon: <Plus size={16} />,
       run: () => createNote(),
     },
@@ -1975,7 +1977,7 @@ export default function Home() {
           </button>
         </div>
         <button className="capture" onClick={createNote}>
-          <Plus size={17} /> New memo <kbd>⌘ N</kbd>
+          <Plus size={17} /> New memo <kbd>{modKey} N</kbd>
         </button>
         <button
           className="template-trigger"
@@ -2213,7 +2215,7 @@ export default function Home() {
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search… tag:work content:meeting"
               />
-              <kbd>⌘ K</kbd>
+              <kbd>{modKey} K</kbd>
             </div>
             <button
               className="icon-btn"
@@ -3097,7 +3099,7 @@ export default function Home() {
             />
             <footer>
               <span>
-                <kbd>⌘ ↵</kbd> to save
+                <kbd>{modKey} ↵</kbd> to save
               </span>
               <div>
                 <button onClick={() => setLinkCaptureOpen(false)}>Cancel</button>
@@ -3159,7 +3161,7 @@ export default function Home() {
             />
             <footer>
               <span>
-                <kbd>⌘ ↵</kbd> to save
+                <kbd>{modKey} ↵</kbd> to save
               </span>
               <div>
                 <button onClick={() => setQuickCaptureOpen(false)}>Cancel</button>
@@ -3566,11 +3568,11 @@ export default function Home() {
             </header>
             <div className="shortcut-row">
               <span>New memo</span>
-              <kbd>⌘ N</kbd>
+              <kbd>{modKey} N</kbd>
             </div>
             <div className="shortcut-row">
               <span>Search / command palette</span>
-              <kbd>⌘ K</kbd>
+              <kbd>{modKey} K</kbd>
             </div>
             <div className="shortcut-row">
               <span>Close any dialog</span>
@@ -3578,11 +3580,11 @@ export default function Home() {
             </div>
             <div className="shortcut-row">
               <span>Bold / italic</span>
-              <kbd>⌘ B · ⌘ I</kbd>
+              <kbd>{`${modKey} B · ${modKey} I`}</kbd>
             </div>
             <div className="shortcut-row">
               <span>Link / list</span>
-              <kbd>⌘ K · ⌘ L</kbd>
+              <kbd>{`${modKey} K · ${modKey} L`}</kbd>
             </div>
             <div className="shortcut-row">
               <span>Move through memos</span>
