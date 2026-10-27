@@ -150,3 +150,7 @@ next-env.d.ts
 # Vercel
 .vercel
 *.tsbuildinfo
+
+# Local environment, except the documented template
+.env*
+!.env.example
