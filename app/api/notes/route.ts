@@ -1,87 +1,114 @@
 import { NextResponse } from "next/server";
-import { listNotes, upsertNotes, type StoredNote } from "../../../lib/local-db";
-import { listPostgresNotes, upsertPostgresNotes } from "../../../lib/postgres-db";
+import { limits, type Note } from "../../../lib/memo";
+import {
+  bearerToken,
+  listNotes,
+  replaceNotes,
+  storeStatus,
+  tokenMatches,
+  upsertNotes,
+} from "../../../lib/server-store";
+import { isValidNote } from "../../../lib/validate-note";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-const allowedColors = new Set(["yellow", "blue", "purple", "green", "orange"]);
-const optionalBooleanKeys = ["favorite", "archived", "pinned", "deleted", "protected"] as const;
+/** Memo text must never be cached by a proxy or the browser. */
+const privateJson = (body: unknown, status = 200) =>
+  NextResponse.json(body, {
+    status,
+    headers: { "Cache-Control": "no-store, private", "X-Content-Type-Options": "nosniff" },
+  });
 
-function isStoredNote(value: unknown): value is StoredNote {
-  if (!value || typeof value !== "object") return false;
-  const note = value as Partial<StoredNote>;
-  const validOptionalBooleans = optionalBooleanKeys.every(
-    (key) => note[key] === undefined || typeof note[key] === "boolean",
-  );
-  const validTags =
-    Array.isArray(note.tags) &&
-    note.tags.length <= 50 &&
-    note.tags.every((tag) => typeof tag === "string" && tag.length <= 80);
-  const validEncryptedFields = [note.encryptedContent, note.recoveryEncryptedContent].every(
-    (field) => field === undefined || (typeof field === "string" && field.length <= 12_000_000),
-  );
-  const validFolder =
-    note.folder === undefined || (typeof note.folder === "string" && note.folder.length <= 100);
-  const validDueAt =
-    note.dueAt === undefined || (typeof note.dueAt === "string" && !Number.isNaN(Date.parse(note.dueAt)));
-  return (
-    typeof note.id === "string" &&
-    note.id.length > 0 &&
-    note.id.length <= 200 &&
-    typeof note.title === "string" &&
-    note.title.trim().length > 0 &&
-    note.title.length <= 500 &&
-    typeof note.content === "string" &&
-    note.content.length <= 10_000_000 &&
-    validTags &&
-    validFolder &&
-    validDueAt &&
-    typeof note.updatedAt === "string" &&
-    !Number.isNaN(Date.parse(note.updatedAt)) &&
-    typeof note.color === "string" &&
-    allowedColors.has(note.color) &&
-    validEncryptedFields &&
-    validOptionalBooleans
-  );
+/**
+ * Resolves the active store and authorises the caller.
+ *
+ * Returns either a usable mode or the response to send back. When no store is
+ * configured this is a 501, which the browser treats as "stay on this device"
+ * rather than as an error worth retrying.
+ */
+async function resolveStore(request: Request) {
+  const status = storeStatus();
+  if (status.mode === "disabled")
+    return {
+      response: privateJson({ error: "Server store is not configured", detail: status.reason }, 501),
+    } as const;
+
+  if (!(await tokenMatches(bearerToken(request))))
+    return { response: privateJson({ error: "Invalid sync passphrase" }, 401) } as const;
+
+  return { mode: status.mode } as const;
 }
 
-export async function GET() {
+/** Reads the body with a hard size ceiling, before handing anything to JSON.parse. */
+async function readBody(request: Request): Promise<{ value: unknown } | { response: NextResponse }> {
+  const declared = Number(request.headers.get("content-length") || 0);
+  if (declared > limits.requestBody)
+    return { response: privateJson({ error: "Request body is too large" }, 413) };
+
+  const text = await request.text();
+  if (text.length > limits.requestBody)
+    return { response: privateJson({ error: "Request body is too large" }, 413) };
+
   try {
-    const notes = process.env.DATABASE_URL ? await listPostgresNotes() : listNotes();
-    return NextResponse.json({ notes });
+    return { value: JSON.parse(text) as unknown };
+  } catch {
+    return { response: privateJson({ error: "Request body is not valid JSON" }, 400) };
+  }
+}
+
+export async function GET(request: Request) {
+  const store = await resolveStore(request);
+  if ("response" in store) return store.response;
+  try {
+    return privateJson({ notes: await listNotes(store.mode), mode: store.mode });
   } catch (error) {
     console.error("Failed to load notes", error);
-    return NextResponse.json({ error: "Could not load notes" }, { status: 500 });
+    return privateJson({ error: "Could not load notes" }, 500);
   }
 }
 
+/** Replaces the stored workspace exactly, including removing deleted memos. */
 export async function PUT(request: Request) {
+  const store = await resolveStore(request);
+  if ("response" in store) return store.response;
+
+  const body = await readBody(request);
+  if ("response" in body) return body.response;
+
+  const notes = (body.value as { notes?: unknown } | null)?.notes;
+  if (!Array.isArray(notes)) return privateJson({ error: "notes must be an array" }, 400);
+  if (!notes.every(isValidNote)) return privateJson({ error: "notes contain an invalid record" }, 400);
+
+  const ids = new Set((notes as Note[]).map((note) => note.id));
+  if (ids.size !== notes.length) return privateJson({ error: "notes contain duplicate ids" }, 400);
+
   try {
-    const body = (await request.json()) as { notes?: StoredNote[] };
-    if (!Array.isArray(body.notes))
-      return NextResponse.json({ error: "notes must be an array" }, { status: 400 });
-    if (!body.notes.every(isStoredNote))
-      return NextResponse.json({ error: "notes contain an invalid record" }, { status: 400 });
-    if (process.env.DATABASE_URL) await upsertPostgresNotes(body.notes, true);
-    else upsertNotes(body.notes, true);
-    const notes = process.env.DATABASE_URL ? await listPostgresNotes() : listNotes();
-    return NextResponse.json({ notes });
+    await replaceNotes(store.mode, notes as Note[]);
+    return privateJson({ notes: await listNotes(store.mode), mode: store.mode });
   } catch (error) {
     console.error("Failed to save notes", error);
-    return NextResponse.json({ error: "Could not save notes" }, { status: 500 });
+    return privateJson({ error: "Could not save notes" }, 500);
   }
 }
 
+/** Upserts a single memo without touching the rest of the workspace. */
 export async function POST(request: Request) {
+  const store = await resolveStore(request);
+  if ("response" in store) return store.response;
+
+  const body = await readBody(request);
+  if ("response" in body) return body.response;
+
+  if (!isValidNote(body.value)) return privateJson({ error: "invalid note" }, 400);
+  const note = body.value;
+
   try {
-    const body = (await request.json()) as StoredNote;
-    if (!isStoredNote(body)) return NextResponse.json({ error: "invalid note" }, { status: 400 });
-    if (process.env.DATABASE_URL) await upsertPostgresNotes([body]);
-    else upsertNotes([body]);
-    const notes = process.env.DATABASE_URL ? await listPostgresNotes() : listNotes();
-    return NextResponse.json({ note: notes.find((note) => note.id === body.id) });
+    await upsertNotes(store.mode, [note]);
+    const stored = await listNotes(store.mode);
+    return privateJson({ note: stored.find((item) => item.id === note.id), mode: store.mode });
   } catch (error) {
     console.error("Failed to save note", error);
-    return NextResponse.json({ error: "Could not save note" }, { status: 500 });
+    return privateJson({ error: "Could not save note" }, 500);
   }
 }

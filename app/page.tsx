@@ -51,260 +51,68 @@ import {
   X,
 } from "lucide-react";
 
-type Note = {
-  id: string;
-  title: string;
-  content: string;
-  tags: string[];
-  folder?: string;
-  dueAt?: string;
-  createdAt?: string;
-  updatedAt: string;
-  favorite?: boolean;
-  archived?: boolean;
-  pinned?: boolean;
-  deleted?: boolean;
-  protected?: boolean;
-  encryptedContent?: string;
-  recoveryEncryptedContent?: string;
-  color: string;
-};
-type MemoTemplate = {
-  id: string;
-  title: string;
-  description: string;
-  tags: string[];
-  color: string;
-  content: string;
-  custom?: boolean;
-};
-const seed: Note[] = [
-  {
-    id: "1",
-    title: "The quiet power of starting small",
-    content:
-      "A tiny beginning is still a beginning.\n\nThe first draft is not supposed to be good — it is supposed to exist. Keep the bar low enough to cross, then keep moving.",
-    tags: ["writing", "ideas"],
-    folder: "inbox",
-    updatedAt: "2026-08-27T09:10:00",
-    favorite: true,
-    pinned: true,
-    color: "yellow",
-  },
-  {
-    id: "2",
-    title: "Q3 product thoughts",
-    content:
-      "Make the first minute feel effortless.\n\n- Reduce the surface area\n- Keep capture one click away\n- Let the user find their way back",
-    tags: ["work", "product"],
-    folder: "work",
-    updatedAt: "2026-08-26T16:30:00",
-    color: "blue",
-  },
-  {
-    id: "3",
-    title: "Books to return to",
-    content:
-      "The Art of Possibility\nThe Creative Act\nFour Thousand Weeks\n\nA good book is a room you can visit again.",
-    tags: ["reading", "personal"],
-    folder: "personal",
-    updatedAt: "2026-08-25T12:04:00",
-    favorite: true,
-    color: "purple",
-  },
-  {
-    id: "4",
-    title: "Morning pages",
-    content:
-      "There is something about writing before the day gets loud. Leave the phone in another room. Make tea. Start with whatever is true.",
-    tags: ["journal"],
-    folder: "personal",
-    updatedAt: "2026-08-24T08:40:00",
-    color: "green",
-  },
-  {
-    id: "5",
-    title: "Ideas for the studio",
-    content:
-      "A small library of beautiful, useful things.\n\nMaybe the best products feel like places rather than tools.",
-    tags: ["ideas", "studio"],
-    folder: "work",
-    updatedAt: "2026-08-21T18:15:00",
-    color: "orange",
-  },
-];
-const templates: MemoTemplate[] = [
-  {
-    id: "daily",
-    title: "Daily note",
-    description: "A quick check-in for today",
-    tags: ["journal", "daily"],
-    color: "green",
-    content: "## What happened\n\n\n## What I learned\n\n\n## Tomorrow\n\n",
-  },
-  {
-    id: "meeting",
-    title: "Meeting notes",
-    description: "Keep decisions and next steps together",
-    tags: ["work", "meeting"],
-    color: "blue",
-    content: "## Agenda\n\n\n## Notes\n\n\n## Decisions\n\n\n## Next steps\n- [ ] ",
-  },
-  {
-    id: "project",
-    title: "Project brief",
-    description: "Turn an idea into a clear starting point",
-    tags: ["work", "project"],
-    color: "orange",
-    content: "## Goal\n\n\n## Why now\n\n\n## First milestone\n\n\n## Open questions\n\n",
-  },
-];
+import {
+  defaultAccent,
+  isNoteColor,
+  limits,
+  noteColors,
+  redactProtected,
+  sampleNotes,
+  templates,
+  type MemoTemplate,
+  type Note,
+  type Revision,
+  type SavedSearch,
+} from "../lib/memo";
+import { excerpt, markdownToHtml, outgoingLinkTitles, taskStats, wordCount } from "../lib/markdown";
+import {
+  highlightTerms,
+  isOverdue,
+  matchesSearch,
+  normalizeTag,
+  tagMatches,
+  tagNamespaces,
+} from "../lib/search";
+import { canProtectMemos, decryptText, encryptText, makeRecoveryCode } from "../lib/crypto";
+import {
+  clearWorkspace,
+  loadWorkspace,
+  readJson,
+  readPref,
+  saveWorkspace,
+  storageEstimate,
+  writeJson,
+  writePref,
+} from "../lib/client-store";
+import {
+  probeServer,
+  pushWorkspace,
+  readPassphrase,
+  writePassphrase,
+  type SyncTarget,
+} from "../lib/sync-client";
+import { coerceImportedNote } from "../lib/validate-note";
 
 const formatDate = (value: string) =>
   new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(new Date(value));
-const formatDueDate = (value: string) =>
-  new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(new Date(value));
-const isOverdue = (value: string) =>
-  new Date(value).getTime() < new Date(new Date().toDateString()).getTime();
-const matchesDateQuery = (value: string | undefined, query: string) => {
-  if (!value) return false;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return false;
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const target = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  const localIsoDate = `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, "0")}-${String(target.getDate()).padStart(2, "0")}`;
-  if (query === "today") return target.getTime() === today.getTime();
-  if (query === "yesterday") return target.getTime() === today.getTime() - 86400000;
-  if (query === "week")
-    return target.getTime() >= today.getTime() - 6 * 86400000 && target.getTime() <= today.getTime();
-  if (query === "month")
-    return target.getFullYear() === today.getFullYear() && target.getMonth() === today.getMonth();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(query)) return localIsoDate === query;
-  return false;
+const formatDueDate = formatDate;
+
+/** Formats a byte count for the storage readout in settings. */
+const formatBytes = (value: number) => {
+  if (value < 1024) return `${value} B`;
+  const units = ["KB", "MB", "GB"];
+  let size = value / 1024;
+  let unit = 0;
+  while (size >= 1024 && unit < units.length - 1) {
+    size /= 1024;
+    unit += 1;
+  }
+  return `${size < 10 ? size.toFixed(1) : Math.round(size)} ${units[unit]}`;
 };
-const taskStats = (content: string) => {
-  const taskSource = content.replace(/```[\s\S]*?```/g, "");
-  const tasks = taskSource.match(/^\s*[-*+] \[[ xX]\] .+$/gm) || [];
-  return { total: tasks.length, completed: tasks.filter((task) => /\[[x]\]/i.test(task)).length };
-};
-const normalizeTag = (value: string) =>
-  value
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, "-")
-    .replace(/\/+/g, "/")
-    .replace(/^\/|\/$/g, "");
-const tagMatches = (tag: string, query: string) => tag === query || tag.startsWith(`${query}/`);
-const excerpt = (value: string) =>
-  value
-    .replace(/[#*_>-]/g, "")
-    .replace(/\n/g, " ")
-    .slice(0, 118) + (value.length > 118 ? "…" : "");
-const markdownToHtml = (value: string) => {
-  let taskIndex = 0;
-  const codeBlocks: string[] = [];
-  const source = value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  return source
-    .replace(/\x60\x60\x60(?:[a-zA-Z0-9_-]+)?\n?([\s\S]*?)\x60\x60\x60/g, (_, code) => {
-      const token = "@@CODE" + codeBlocks.length + "@@";
-      codeBlocks.push("<pre><code>" + code.trim() + "</code></pre>");
-      return token;
-    })
-    .replace(/\x60([^\x60\n]+)\x60/g, "<code>$1</code>")
-    .replace(/~~(.*?)~~/g, "<del>$1</del>")
-    .replace(/^&gt; (.*)$/gm, "<blockquote>$1</blockquote>")
-    .replace(/^(---|___|\*\*\*)$/gm, "<hr />")
-    .replace(/^### (.*)$/gm, "<h3>$1</h3>")
-    .replace(/^## (.*)$/gm, "<h2>$1</h2>")
-    .replace(/^# (.*)$/gm, "<h1>$1</h1>")
-    .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-    .replace(/_(.*?)_/g, "<em>$1</em>")
-    .replace(
-      /\[\[([^\]]+)\]\]/g,
-      (_, title) =>
-        '<a class="internal-link" href="#memo-' + encodeURIComponent(title) + '">' + title + "</a>",
-    )
-    .replace(
-      /!\[([^\]]*)\]\((data:image\/(?:png|jpeg|jpg|gif|webp);base64,[^)]+)\)/gi,
-      '<img src="$2" alt="$1" loading="lazy" />',
-    )
-    .replace(
-      /\[([^\]]+)\]\((https?:\/\/[^\s)]+|mailto:[^\s)]+)\)/gi,
-      '<a href="$2" target="_blank" rel="noreferrer noopener">$1</a>',
-    )
-    .replace(
-      /^\s*[-*+] \[([ xX])\] (.*)$/gm,
-      (_, mark, text) =>
-        '<li class="task-item"><label><input type="checkbox" data-task-index="' +
-        taskIndex++ +
-        '" ' +
-        (mark.toLowerCase() === "x" ? "checked" : "") +
-        "/> " +
-        text +
-        "</label></li>",
-    )
-    .replace(/^- (.*)$/gm, "<li>$1</li>")
-    .replace(/\n\n/g, "</p><p>")
-    .replace(/\n/g, "<br />")
-    .replace(/@@CODE(\d+)@@/g, (_, index) => codeBlocks[Number(index)]);
-};
-function matchesSearch(note: Note, rawQuery: string) {
-  const tokens = rawQuery.match(/(?:[^\s"]+|"[^"]*")+/g) || [];
-  return tokens.every((rawToken) => {
-    const negative = rawToken.startsWith("-");
-    const token = (negative ? rawToken.slice(1) : rawToken).replace(/^"|"$/g, "");
-    const separator = token.indexOf(":");
-    const field = separator > 0 ? token.slice(0, separator).toLowerCase() : "all";
-    const rawValue = separator > 0 ? token.slice(separator + 1) : token;
-    const value = field === "tag" ? normalizeTag(rawValue) : rawValue.toLowerCase();
-    const stats = taskStats(note.content);
-    const taskState = stats.total
-      ? `${stats.completed === stats.total ? "completed" : "task"} ${stats.completed < stats.total ? "open" : ""}`
-      : "";
-    const dueState = note.dueAt ? `due ${isOverdue(note.dueAt) ? "overdue" : "upcoming"}` : "";
-    const protectionState = note.protected ? "protected" : "unprotected";
-    const haystack =
-      `${note.title} ${note.content} ${note.tags.join(" ")} ${note.folder || "inbox"}`.toLowerCase();
-    const scoped =
-      field === "tag"
-        ? note.tags.join(" ").toLowerCase()
-        : field === "folder"
-          ? (note.folder || "inbox").toLowerCase()
-          : field === "title"
-            ? note.title.toLowerCase()
-            : field === "content"
-              ? note.content.toLowerCase()
-              : field === "is"
-                ? `${note.favorite ? "favorite" : ""} ${note.pinned ? "pinned" : ""} ${note.archived ? "archived" : ""} ${protectionState} ${taskState} ${dueState}`
-                : haystack;
-    const found =
-      field === "tag"
-        ? note.tags.some((tag) => tagMatches(tag, value))
-        : field === "date"
-          ? matchesDateQuery(note.updatedAt, value)
-          : field === "is"
-            ? scoped.split(" ").includes(value)
-            : scoped.includes(value);
-    return negative ? !found : found;
-  });
-}
+
+/** Wraps each matching search term in the given text with a <mark>. */
 function HighlightedText({ value, query }: { value: string; query: string }) {
-  const tokens = query.match(/(?:[^\s"]+|"[^"]*")+/g) || [];
-  const terms = Array.from(
-    new Set(
-      tokens
-        .map(
-          (rawToken) =>
-            (rawToken.startsWith("-") ? rawToken.slice(1) : rawToken)
-              .replace(/^"|"$/g, "")
-              .split(":")
-              .pop()
-              ?.toLowerCase() || "",
-        )
-        .filter((term) => term.length > 1),
-    ),
-  );
+  const terms = useMemo(() => highlightTerms(query), [query]);
   if (!terms.length) return <>{value}</>;
   const pattern = new RegExp(
     `(${terms.map((term) => term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`,
@@ -318,60 +126,10 @@ function HighlightedText({ value, query }: { value: string; query: string }) {
     </>
   );
 }
-const encode = (bytes: Uint8Array) => {
-  let binary = "";
-  for (let index = 0; index < bytes.length; index += 0x8000)
-    binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
-  return btoa(binary);
-};
-const decode = (value: string) => Uint8Array.from(atob(value), (char) => char.charCodeAt(0));
-const makeRecoveryCode = () => {
-  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  const bytes = crypto.getRandomValues(new Uint8Array(12));
-  return (
-    Array.from(bytes, (byte) => alphabet[byte % alphabet.length])
-      .join("")
-      .match(/.{1,4}/g)
-      ?.join("-") || ""
-  );
-};
-async function deriveKey(password: string, salt: Uint8Array) {
-  const material = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, [
-    "deriveKey",
-  ]);
-  return crypto.subtle.deriveKey(
-    { name: "PBKDF2", salt: salt as BufferSource, iterations: 120000, hash: "SHA-256" },
-    material,
-    { name: "AES-GCM", length: 256 },
-    false,
-    ["encrypt", "decrypt"],
-  );
-}
-async function encryptText(value: string, password: string) {
-  const salt = crypto.getRandomValues(new Uint8Array(16));
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const key = await deriveKey(password, salt);
-  const encrypted = await crypto.subtle.encrypt(
-    { name: "AES-GCM", iv: iv as BufferSource },
-    key,
-    new TextEncoder().encode(value),
-  );
-  return JSON.stringify({ salt: encode(salt), iv: encode(iv), data: encode(new Uint8Array(encrypted)) });
-}
-async function decryptText(payload: string, password: string) {
-  const parsed = JSON.parse(payload) as { salt: string; iv: string; data: string };
-  const key = await deriveKey(password, decode(parsed.salt));
-  const decrypted = await crypto.subtle.decrypt(
-    { name: "AES-GCM", iv: decode(parsed.iv) as BufferSource },
-    key,
-    decode(parsed.data) as BufferSource,
-  );
-  return new TextDecoder().decode(decrypted);
-}
 
 export default function Home() {
-  const [notes, setNotes] = useState<Note[]>(seed);
-  const [activeId, setActiveId] = useState("1");
+  const [notes, setNotes] = useState<Note[]>(sampleNotes);
+  const [activeId, setActiveId] = useState(sampleNotes[0].id);
   const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
   const [view, setView] = useState<"grid" | "list">("grid");
@@ -391,6 +149,10 @@ export default function Home() {
   const [commandIndex, setCommandIndex] = useState(0);
   const [toast, setToast] = useState("");
   const [syncState, setSyncState] = useState<"saved" | "saving" | "offline">("saved");
+  const [syncTarget, setSyncTarget] = useState<SyncTarget["kind"]>("device");
+  const [storageNotice, setStorageNotice] = useState("");
+  const [storageUsage, setStorageUsage] = useState<{ usage: number; quota: number } | null>(null);
+  const [passphraseInput, setPassphraseInput] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const [connectionsOpen, setConnectionsOpen] = useState(false);
@@ -405,12 +167,12 @@ export default function Home() {
   const [helpOpen, setHelpOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [customFolders, setCustomFolders] = useState<string[]>([]);
-  const [savedSearches, setSavedSearches] = useState<Array<{ id: string; name: string; query: string }>>([]);
+  const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
   const [customTemplates, setCustomTemplates] = useState<MemoTemplate[]>([]);
   const [templateOpen, setTemplateOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [revisions, setRevisions] = useState<Array<{ content: string; title: string; savedAt: string }>>([]);
-  const [accent, setAccent] = useState("#df6b43");
+  const [revisions, setRevisions] = useState<Revision[]>([]);
+  const [accent, setAccent] = useState(defaultAccent);
   const [compact, setCompact] = useState(false);
   const [passwordPrompt, setPasswordPrompt] = useState<Note | null>(null);
   const [recoveryPrompt, setRecoveryPrompt] = useState<Note | null>(null);
@@ -434,26 +196,28 @@ export default function Home() {
   const active = notes.find((note) => note.id === activeId) ?? notes[0];
 
   useEffect(() => {
+    const controller = new AbortController();
     let cancelled = false;
-    const storedFolders = localStorage.getItem("memo-folders");
-    if (storedFolders) {
-      try {
-        setCustomFolders(JSON.parse(storedFolders));
-      } catch {
-        localStorage.removeItem("memo-folders");
-      }
-    }
-    const storedSearches = localStorage.getItem("memo-saved-searches");
-    if (storedSearches) {
-      try {
-        setSavedSearches(JSON.parse(storedSearches));
-      } catch {
-        localStorage.removeItem("memo-saved-searches");
-      }
-    }
-    const storedView = localStorage.getItem("memo-view");
+
+    setCustomFolders(readJson<string[]>("memo-folders", []).filter((folder) => typeof folder === "string"));
+    setSavedSearches(
+      readJson<SavedSearch[]>("memo-saved-searches", []).filter(
+        (saved) => !!saved && typeof saved.name === "string" && typeof saved.query === "string",
+      ),
+    );
+    setCustomTemplates(
+      readJson<MemoTemplate[]>("memo-templates", []).filter(
+        (template) =>
+          !!template &&
+          typeof template === "object" &&
+          typeof template.id === "string" &&
+          typeof template.title === "string" &&
+          typeof template.content === "string",
+      ),
+    );
+    const storedView = readPref("memo-view");
     if (storedView === "grid" || storedView === "list") setView(storedView);
-    const storedSort = localStorage.getItem("memo-sort");
+    const storedSort = readPref("memo-sort");
     if (
       storedSort === "updated" ||
       storedSort === "title" ||
@@ -461,48 +225,42 @@ export default function Home() {
       storedSort === "due"
     )
       setSort(storedSort);
-    const load = async () => {
-      const saved = localStorage.getItem("memo-notes");
-      try {
-        const response = await fetch("/api/notes");
-        const payload = (await response.json()) as { notes?: Note[] };
-        if (!cancelled && payload.notes?.length) setNotes(payload.notes);
-        else if (!cancelled) {
-          const initial = saved ? JSON.parse(saved) : seed;
-          setNotes(initial);
-          persistToApi(initial);
-        }
-      } catch {
-        if (!cancelled && saved) setNotes(JSON.parse(saved));
+    setDark(readPref("memo-theme") === "dark");
+    setAccent(readPref("memo-accent") || defaultAccent);
+    setCompact(readPref("memo-density") === "compact");
+    setPassphraseInput(readPassphrase());
+
+    /**
+     * Works out where this workspace lives, then opens it.
+     *
+     * The device copy and the server probe run together so a slow or absent
+     * server never delays first paint, and a server workspace replaces the
+     * device copy only when the server genuinely holds memos.
+     */
+    const start = async () => {
+      const [device, probe] = await Promise.all([loadWorkspace(), probeServer(controller.signal)]);
+      if (cancelled) return;
+      setSyncTarget(probe.target.kind);
+
+      if (probe.target.kind === "server" && probe.notes?.length) {
+        setNotes(probe.notes);
+        setActiveId(probe.notes[0].id);
+        setSyncState("saved");
+        return;
       }
+
+      const initial = device?.length ? device : sampleNotes;
+      setNotes(initial);
+      setActiveId(initial[0].id);
+      if (probe.target.kind === "server") persistWorkspace(initial, "server");
+      else setSyncState("saved");
     };
-    void load();
-    setDark(localStorage.getItem("memo-theme") === "dark");
-    setAccent(localStorage.getItem("memo-accent") || "#df6b43");
-    setCompact(localStorage.getItem("memo-density") === "compact");
+    void start();
+
     return () => {
       cancelled = true;
+      controller.abort();
     };
-  }, []);
-  useEffect(() => {
-    const storedTemplates = localStorage.getItem("memo-templates");
-    if (!storedTemplates) return;
-    try {
-      const parsed = JSON.parse(storedTemplates) as unknown;
-      if (Array.isArray(parsed))
-        setCustomTemplates(
-          parsed.filter(
-            (template): template is MemoTemplate =>
-              template &&
-              typeof template === "object" &&
-              typeof (template as MemoTemplate).id === "string" &&
-              typeof (template as MemoTemplate).title === "string" &&
-              typeof (template as MemoTemplate).content === "string",
-          ),
-        );
-    } catch {
-      localStorage.removeItem("memo-templates");
-    }
   }, []);
   useEffect(() => {
     if (process.env.NODE_ENV === "production" && "serviceWorker" in navigator)
@@ -546,10 +304,24 @@ export default function Home() {
     }
   }, [notes]);
   useEffect(() => {
-    localStorage.setItem(
-      "memo-notes",
-      JSON.stringify(notes.map((note) => (note.protected ? { ...note, content: "" } : note))),
-    );
+    if (!notes.length) return;
+    let cancelled = false;
+    // Protected plaintext is held in memory only; the device copy keeps ciphertext.
+    void saveWorkspace(redactProtected(notes)).then((outcome) => {
+      if (cancelled) return;
+      if (!outcome.ok)
+        setStorageNotice(
+          outcome.reason === "quota"
+            ? "This device is out of storage. Export a backup, then remove some embedded images."
+            : "This browser is not allowing memos to be saved. Export a backup to be safe.",
+        );
+      else if (!outcome.durable)
+        setStorageNotice("This browser blocked its database, so memos are in a smaller fallback store.");
+      else setStorageNotice("");
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [notes]);
   useEffect(() => {
     const preview = document.querySelector<HTMLElement>(".editor-preview");
@@ -616,75 +388,96 @@ export default function Home() {
   }, [active?.id, previewMode]);
   useEffect(() => {
     document.documentElement.dataset.theme = dark ? "dark" : "light";
-    localStorage.setItem("memo-theme", dark ? "dark" : "light");
+    writePref("memo-theme", dark ? "dark" : "light");
   }, [dark]);
   useEffect(() => {
     document.documentElement.style.setProperty("--accent", accent);
     document.documentElement.style.setProperty("--accent-deep", accent);
     document.documentElement.dataset.density = compact ? "compact" : "comfortable";
-    localStorage.setItem("memo-accent", accent);
-    localStorage.setItem("memo-density", compact ? "compact" : "comfortable");
+    writePref("memo-accent", accent);
+    writePref("memo-density", compact ? "compact" : "comfortable");
   }, [accent, compact]);
   useEffect(() => {
-    localStorage.setItem("memo-view", view);
-    localStorage.setItem("memo-sort", sort);
+    writePref("memo-view", view);
+    writePref("memo-sort", sort);
   }, [view, sort]);
   useEffect(() => {
     if (!editorOpen) setFocusMode(false);
   }, [editorOpen]);
   useEffect(() => {
-    const handler = (event: KeyboardEvent) => {
-      if (
-        (event.metaKey || event.ctrlKey) &&
-        event.key.toLowerCase() === "k" &&
-        !["INPUT", "TEXTAREA"].includes((event.target as HTMLElement).tagName)
-      ) {
-        event.preventDefault();
-        setCommandQuery("");
-        setCommandIndex(0);
-        setCommandOpen(true);
-      }
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "n") {
-        event.preventDefault();
-        createNote();
-      }
-      if (
-        event.key.toLowerCase() === "q" &&
-        !event.metaKey &&
-        !event.ctrlKey &&
-        !["INPUT", "TEXTAREA", "SELECT"].includes((event.target as HTMLElement).tagName)
-      ) {
-        event.preventDefault();
-        setQuickCaptureTitle("");
-        setQuickCaptureValue("");
-        setQuickCaptureOpen(true);
-      }
-      if (event.key === "Escape") {
-        setCommandOpen(false);
-        setCommandQuery("");
-        setCommandIndex(0);
-        setEditorOpen(false);
-        setPasswordPrompt(null);
-        setRecoveryPrompt(null);
-        setRecoveryNotice("");
-        setAnalyticsOpen(false);
-        setConnectionsOpen(false);
-        setHelpOpen(false);
-        setSettingsOpen(false);
-        setTemplateOpen(false);
-        setQuickCaptureOpen(false);
-        setLinkCaptureOpen(false);
-        setHistoryOpen(false);
-        setQuickCaptureTitle("");
-        setQuickCaptureValue("");
-        setLinkCaptureUrl("");
-        setLinkCaptureTitle("");
-        setLinkCaptureNote("");
-      }
+    // A debounced save would otherwise be lost if the tab closes within 250 ms.
+    const flush = () => {
+      if (!pendingSave.current) return;
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      flushPendingSave();
     };
+    const onHidden = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", onHidden);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", onHidden);
+    };
+  }, []);
+  // Held in a ref so the listener below stays registered while still seeing
+  // current state; re-binding it on every render churned the event listener.
+  const shortcutRef = useRef<(event: KeyboardEvent) => void>(() => undefined);
+  shortcutRef.current = (event: KeyboardEvent) => {
+    if (
+      (event.metaKey || event.ctrlKey) &&
+      event.key.toLowerCase() === "k" &&
+      !["INPUT", "TEXTAREA"].includes((event.target as HTMLElement).tagName)
+    ) {
+      event.preventDefault();
+      setCommandQuery("");
+      setCommandIndex(0);
+      setCommandOpen(true);
+    }
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "n") {
+      event.preventDefault();
+      createNote();
+    }
+    if (
+      event.key.toLowerCase() === "q" &&
+      !event.metaKey &&
+      !event.ctrlKey &&
+      !["INPUT", "TEXTAREA", "SELECT"].includes((event.target as HTMLElement).tagName)
+    ) {
+      event.preventDefault();
+      setQuickCaptureTitle("");
+      setQuickCaptureValue("");
+      setQuickCaptureOpen(true);
+    }
+    if (event.key === "Escape") {
+      setCommandOpen(false);
+      setCommandQuery("");
+      setCommandIndex(0);
+      setEditorOpen(false);
+      setPasswordPrompt(null);
+      setRecoveryPrompt(null);
+      setRecoveryNotice("");
+      setAnalyticsOpen(false);
+      setConnectionsOpen(false);
+      setHelpOpen(false);
+      setSettingsOpen(false);
+      setTemplateOpen(false);
+      setQuickCaptureOpen(false);
+      setLinkCaptureOpen(false);
+      setHistoryOpen(false);
+      setQuickCaptureTitle("");
+      setQuickCaptureValue("");
+      setLinkCaptureUrl("");
+      setLinkCaptureTitle("");
+      setLinkCaptureNote("");
+    }
+  };
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => shortcutRef.current(event);
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  });
+  }, []);
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       if (event.key === "Escape" && query.trim()) {
@@ -735,8 +528,7 @@ export default function Home() {
             (dateFilter === "today" && noteAge < 86400000) ||
             (dateFilter === "week" && noteAge < 604800000) ||
             (dateFilter === "month" && noteAge < 2592000000);
-          const words =
-            note.protected && !unlockedKeys[note.id] ? 0 : note.content.split(/\s+/).filter(Boolean).length;
+          const words = note.protected && !unlockedKeys[note.id] ? 0 : wordCount(note.content);
           const lengthMatches =
             lengthFilter === "any" ||
             (lengthFilter === "short" && words < 100) ||
@@ -758,16 +550,7 @@ export default function Home() {
     [notes, query, filter, sort, dateFilter, lengthFilter],
   );
   const tags = Array.from(
-    new Set(
-      notes
-        .filter((note) => !note.deleted)
-        .flatMap((note) =>
-          note.tags.flatMap((tag) => {
-            const parts = tag.split("/");
-            return parts.map((_, index) => parts.slice(0, index + 1).join("/"));
-          }),
-        ),
-    ),
+    new Set(notes.filter((note) => !note.deleted).flatMap((note) => note.tags.flatMap(tagNamespaces))),
   ).sort((a, b) => a.localeCompare(b));
   const allTemplates = [...templates, ...customTemplates];
   const folders = Array.from(
@@ -780,9 +563,7 @@ export default function Home() {
     ]),
   );
   const activeTags = active?.tags ?? [];
-  const outgoingLinks = active
-    ? Array.from(active.content.matchAll(/\[\[([^\]]+)\]\]/g)).map((match) => match[1])
-    : [];
+  const outgoingLinks = active ? outgoingLinkTitles(active.content) : [];
   const linkedNotes = active
     ? notes.filter(
         (note) =>
@@ -871,45 +652,110 @@ export default function Home() {
     helpOpen,
     settingsOpen,
   ]);
-  function retrySync() {
+  async function retrySync() {
     if (!notes.length) {
       notify("There are no memos to sync");
       return;
     }
-    persistToApi(notes);
+    const probe = await probeServer();
+    setSyncTarget(probe.target.kind);
+    if (probe.target.kind !== "server") {
+      setSyncState("saved");
+      notify(
+        probe.target.kind === "locked"
+          ? "Add your sync passphrase in settings"
+          : "This workspace is saved on this device",
+      );
+      return;
+    }
+    persistWorkspace(notes);
     notify("Sync retry queued");
   }
   const notify = (message: string) => {
     setToast(message);
     window.setTimeout(() => setToast(""), 2200);
   };
-  function persistToApi(nextNotes: Note[]) {
-    const safeNotes = nextNotes.map((note) => ({
-      ...note,
-      title: note.title.trim() || "Untitled memo",
-      content: note.protected ? "" : note.content,
-    }));
-    pendingSave.current = safeNotes;
+  /**
+   * Queues the workspace for the server store.
+   *
+   * The device copy is written by its own effect, so when no server store is
+   * reachable this only has to report that the work is already safe.
+   */
+  function persistWorkspace(nextNotes: Note[], target: SyncTarget["kind"] = syncTarget) {
+    if (target !== "server") {
+      pendingSave.current = null;
+      setSyncState("saved");
+      return;
+    }
+    pendingSave.current = redactProtected(
+      nextNotes.map((note) => ({ ...note, title: note.title.trim() || "Untitled memo" })),
+    );
     setSyncState("saving");
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      const notesToSave = pendingSave.current;
-      pendingSave.current = null;
-      if (!notesToSave) return;
-      saveQueue.current = saveQueue.current
-        .catch(() => undefined)
-        .then(async () => {
-          const response = await fetch("/api/notes", {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ notes: notesToSave }),
-          });
-          if (!response.ok) throw new Error("save failed");
-          setSyncState("saved");
-        })
-        .catch(() => setSyncState("offline"));
-    }, 250);
+    saveTimer.current = setTimeout(flushPendingSave, 250);
   }
+
+  /** Sends the newest queued workspace, never more than one request at a time. */
+  function flushPendingSave() {
+    const notesToSave = pendingSave.current;
+    pendingSave.current = null;
+    if (!notesToSave) return;
+    saveQueue.current = saveQueue.current
+      .catch(() => undefined)
+      .then(async () => {
+        const result = await pushWorkspace(notesToSave);
+        if (result === "saved") setSyncState("saved");
+        else if (result === "offline") setSyncState("offline");
+        else {
+          // The server withdrew its store mid-session; the device copy stands.
+          setSyncTarget(result);
+          setSyncState("saved");
+        }
+      });
+  }
+  /** Saves a sync passphrase, then re-probes so the UI reflects the new access. */
+  async function applyPassphrase() {
+    writePassphrase(passphraseInput);
+    const probe = await probeServer();
+    setSyncTarget(probe.target.kind);
+    if (probe.target.kind === "server") {
+      if (probe.notes?.length) {
+        setNotes(probe.notes);
+        setActiveId(probe.notes[0].id);
+        setSyncState("saved");
+        notify("Sync connected");
+      } else {
+        persistWorkspace(notes, "server");
+        notify("Sync connected — uploading this workspace");
+      }
+      return;
+    }
+    setSyncState("saved");
+    notify(
+      probe.target.kind === "locked"
+        ? "That passphrase was not accepted"
+        : "This deployment has no shared database",
+    );
+  }
+
+  /** Clears every memo held in this browser. The server copy, if any, is untouched. */
+  async function forgetDeviceWorkspace() {
+    if (
+      !window.confirm(
+        "Remove every memo stored in this browser? Export a backup first — this cannot be undone.",
+      )
+    )
+      return;
+    await clearWorkspace();
+    setNotes([]);
+    setActiveId("");
+    setSelectedIds([]);
+    setEditorOpen(false);
+    setSettingsOpen(false);
+    setStorageNotice("");
+    notify("Memos removed from this device");
+  }
+
   function createNote() {
     const now = new Date().toISOString();
     const note: Note = {
@@ -924,7 +770,7 @@ export default function Home() {
     };
     const nextNotes = [note, ...notes];
     setNotes(nextNotes);
-    persistToApi(nextNotes);
+    persistWorkspace(nextNotes);
     setActiveId(note.id);
     setEditorOpen(true);
     setSidebarOpen(false);
@@ -948,7 +794,7 @@ export default function Home() {
     };
     const nextNotes = [note, ...notes];
     setNotes(nextNotes);
-    persistToApi(nextNotes);
+    persistWorkspace(nextNotes);
     setActiveId(note.id);
     setQuickCaptureOpen(false);
     setQuickCaptureTitle("");
@@ -982,7 +828,7 @@ export default function Home() {
     };
     const nextNotes = [note, ...notes];
     setNotes(nextNotes);
-    persistToApi(nextNotes);
+    persistWorkspace(nextNotes);
     setActiveId(note.id);
     setLinkCaptureOpen(false);
     setLinkCaptureUrl("");
@@ -1020,7 +866,7 @@ export default function Home() {
     };
     const nextNotes = [note, ...notes];
     setNotes(nextNotes);
-    persistToApi(nextNotes);
+    persistWorkspace(nextNotes);
     setActiveId(note.id);
     setEditorOpen(true);
     setTemplateOpen(false);
@@ -1041,23 +887,23 @@ export default function Home() {
     if (!title) return;
     const template: MemoTemplate = {
       id: `custom-${crypto.randomUUID()}`,
-      title: title.slice(0, 100),
+      title: title.slice(0, limits.folder),
       description: `From ${active.title}`,
       tags: active.tags.slice(0, 20),
       color: active.color,
       content: active.content,
       custom: true,
     };
-    const nextTemplates = [...customTemplates, template].slice(-30);
+    const nextTemplates = [...customTemplates, template].slice(-limits.customTemplates);
     setCustomTemplates(nextTemplates);
-    localStorage.setItem("memo-templates", JSON.stringify(nextTemplates));
+    writeJson("memo-templates", nextTemplates);
     setTemplateOpen(true);
     notify("Template saved");
   }
   function removeCustomTemplate(id: string) {
     const nextTemplates = customTemplates.filter((template) => template.id !== id);
     setCustomTemplates(nextTemplates);
-    localStorage.setItem("memo-templates", JSON.stringify(nextTemplates));
+    writeJson("memo-templates", nextTemplates);
     notify("Template removed");
   }
   function duplicateNote() {
@@ -1081,7 +927,7 @@ export default function Home() {
     };
     const nextNotes = [duplicate, ...notes];
     setNotes(nextNotes);
-    persistToApi(nextNotes);
+    persistWorkspace(nextNotes);
     setActiveId(duplicate.id);
     setEditorOpen(true);
     notify("Memo duplicated");
@@ -1090,34 +936,28 @@ export default function Home() {
     if (!active) return;
     if (patch.content !== undefined && patch.content !== active.content && !historySkip.current) {
       const history = historyRef.current[active.id] || { past: [], future: [] };
-      history.past = [...history.past.slice(-49), active.content];
+      history.past = [...history.past.slice(-(limits.undoDepth - 1)), active.content];
       history.future = [];
       historyRef.current[active.id] = history;
     }
     if (patch.content !== undefined && patch.content !== active.content && !active.protected) {
-      try {
-        const allRevisions = JSON.parse(localStorage.getItem("memo-revisions") || "{}") as Record<
-          string,
-          Array<{ content: string; title: string; savedAt: string }>
-        >;
-        const currentRevisions = allRevisions[active.id] || [];
-        const last = currentRevisions[0];
-        if (!last || Date.now() - new Date(last.savedAt).getTime() > 8000) {
-          allRevisions[active.id] = [
-            { content: active.content, title: active.title, savedAt: new Date().toISOString() },
-            ...currentRevisions,
-          ].slice(0, 20);
-          localStorage.setItem("memo-revisions", JSON.stringify(allRevisions));
-        }
-      } catch {
-        localStorage.removeItem("memo-revisions");
+      const allRevisions = readJson<Record<string, Revision[]>>("memo-revisions", {});
+      const currentRevisions = allRevisions[active.id] || [];
+      const last = currentRevisions[0];
+      // One snapshot per burst of typing rather than one per keystroke.
+      if (!last || Date.now() - new Date(last.savedAt).getTime() > 8000) {
+        allRevisions[active.id] = [
+          { content: active.content, title: active.title, savedAt: new Date().toISOString() },
+          ...currentRevisions,
+        ].slice(0, limits.revisionsPerNote);
+        writeJson("memo-revisions", allRevisions);
       }
     }
     const nextNotes = notes.map((note) =>
       note.id === active.id ? { ...note, ...patch, updatedAt: new Date().toISOString() } : note,
     );
     setNotes(nextNotes);
-    persistToApi(nextNotes);
+    persistWorkspace(nextNotes);
     if (active.protected && patch.content !== undefined && unlockedKeys[active.id]) {
       const version = ++encryptionVersion.current;
       void encryptText(patch.content, unlockedKeys[active.id])
@@ -1127,22 +967,15 @@ export default function Home() {
             note.id === active.id ? { ...note, encryptedContent } : note,
           );
           setNotes(encryptedNotes);
-          persistToApi(encryptedNotes);
+          persistWorkspace(encryptedNotes);
         })
         .catch(() => notify("Could not re-encrypt this memo"));
     }
   }
   function clearRevisionHistory(noteId: string) {
-    try {
-      const allRevisions = JSON.parse(localStorage.getItem("memo-revisions") || "{}") as Record<
-        string,
-        unknown
-      >;
-      delete allRevisions[noteId];
-      localStorage.setItem("memo-revisions", JSON.stringify(allRevisions));
-    } catch {
-      localStorage.removeItem("memo-revisions");
-    }
+    const allRevisions = readJson<Record<string, Revision[]>>("memo-revisions", {});
+    delete allRevisions[noteId];
+    writeJson("memo-revisions", allRevisions);
   }
   function openHistory() {
     if (!active) return;
@@ -1150,23 +983,15 @@ export default function Home() {
       notify("Protected memos do not keep plaintext history");
       return;
     }
-    try {
-      const allRevisions = JSON.parse(localStorage.getItem("memo-revisions") || "{}") as Record<
-        string,
-        Array<{ content: string; title: string; savedAt: string }>
-      >;
-      const entries = allRevisions[active.id] || [];
-      if (!entries.length) {
-        notify("No saved revisions for this memo yet");
-        return;
-      }
-      setRevisions(entries);
-      setHistoryOpen(true);
-    } catch {
-      notify("Revision history is unavailable");
+    const entries = readJson<Record<string, Revision[]>>("memo-revisions", {})[active.id] || [];
+    if (!entries.length) {
+      notify("No saved revisions for this memo yet");
+      return;
     }
+    setRevisions(entries);
+    setHistoryOpen(true);
   }
-  function restoreRevision(revision: { content: string; title: string; savedAt: string }) {
+  function restoreRevision(revision: Revision) {
     updateNote({ title: revision.title, content: revision.content });
     setHistoryOpen(false);
     notify("Revision restored");
@@ -1209,7 +1034,7 @@ export default function Home() {
         : note,
     );
     setNotes(nextNotes);
-    persistToApi(nextNotes);
+    persistWorkspace(nextNotes);
     setActiveId(notes.find((note) => note.id !== active.id && !note.deleted)?.id ?? "");
     setEditorOpen(false);
     notify("Memo moved to trash");
@@ -1219,14 +1044,14 @@ export default function Home() {
       item.id === note.id ? { ...item, deleted: false, updatedAt: new Date().toISOString() } : item,
     );
     setNotes(nextNotes);
-    persistToApi(nextNotes);
+    persistWorkspace(nextNotes);
     notify("Memo restored");
   }
   function permanentlyDelete(note: Note) {
     if (!window.confirm(`Permanently delete “${note.title}”? This cannot be undone.`)) return;
     const nextNotes = notes.filter((item) => item.id !== note.id);
     setNotes(nextNotes);
-    persistToApi(nextNotes);
+    persistWorkspace(nextNotes);
     notify("Memo permanently deleted");
   }
   function emptyTrash() {
@@ -1243,7 +1068,7 @@ export default function Home() {
       return;
     const nextNotes = notes.filter((note) => !note.deleted);
     setNotes(nextNotes);
-    persistToApi(nextNotes);
+    persistWorkspace(nextNotes);
     setActiveId(nextNotes[0]?.id || "");
     notify("Trash emptied");
   }
@@ -1270,7 +1095,7 @@ export default function Home() {
         : note,
     );
     setNotes(nextNotes);
-    persistToApi(nextNotes);
+    persistWorkspace(nextNotes);
     setSelectedIds([]);
     setActiveId(nextNotes.find((note) => !note.deleted && !note.archived)?.id || nextNotes[0]?.id || "");
     notify(
@@ -1289,7 +1114,7 @@ export default function Home() {
       selected.has(note.id) ? { ...note, [flag]: shouldEnable, updatedAt: now } : note,
     );
     setNotes(nextNotes);
-    persistToApi(nextNotes);
+    persistWorkspace(nextNotes);
     setSelectedIds([]);
     notify(
       `${selectedIds.length} memo${selectedIds.length === 1 ? "" : "s"} ${shouldEnable ? `added to ${flag === "favorite" ? "favorites" : "pinned"}` : `removed from ${flag === "favorite" ? "favorites" : "pins"}`}`,
@@ -1316,7 +1141,7 @@ export default function Home() {
       completedIds.has(note.id) ? { ...note, archived: true, updatedAt: now } : note,
     );
     setNotes(nextNotes);
-    persistToApi(nextNotes);
+    persistWorkspace(nextNotes);
     setFilter("archived");
     setQuery("");
     notify(`${completedIds.size} completed task memo${completedIds.size === 1 ? "" : "s"} archived`);
@@ -1329,7 +1154,7 @@ export default function Home() {
       selected.has(note.id) ? { ...note, folder, updatedAt: now } : note,
     );
     setNotes(nextNotes);
-    persistToApi(nextNotes);
+    persistWorkspace(nextNotes);
     setSelectedIds([]);
     notify(`${selectedIds.length} memo${selectedIds.length === 1 ? "" : "s"} moved to ${folder}`);
   }
@@ -1351,7 +1176,7 @@ export default function Home() {
       return { ...note, tags, updatedAt: now };
     });
     setNotes(nextNotes);
-    persistToApi(nextNotes);
+    persistWorkspace(nextNotes);
     setSelectedIds([]);
     setBulkTagInput("");
     notify(
@@ -1378,7 +1203,7 @@ export default function Home() {
     }
     const nextFolders = [...customFolders, folder];
     setCustomFolders(nextFolders);
-    localStorage.setItem("memo-folders", JSON.stringify(nextFolders));
+    writeJson("memo-folders", nextFolders);
     if (active) {
       updateNote({ folder });
       notify(`Moved to ${folder}`);
@@ -1401,13 +1226,13 @@ export default function Home() {
     const saved = { id: crypto.randomUUID(), name, query: cleanQuery };
     const nextSearches = [...savedSearches, saved];
     setSavedSearches(nextSearches);
-    localStorage.setItem("memo-saved-searches", JSON.stringify(nextSearches));
+    writeJson("memo-saved-searches", nextSearches);
     notify(`Saved view “${name}” created`);
   }
   function removeSavedSearch(id: string) {
     const nextSearches = savedSearches.filter((saved) => saved.id !== id);
     setSavedSearches(nextSearches);
-    localStorage.setItem("memo-saved-searches", JSON.stringify(nextSearches));
+    writeJson("memo-saved-searches", nextSearches);
     notify("Saved view removed");
   }
   function exportNotes(sourceNotes = notes, filename = "memo-no-sekai-export.json") {
@@ -1489,10 +1314,7 @@ export default function Home() {
       totals: {
         memos: visibleNotes.length,
         protectedMemos: visibleNotes.filter((note) => note.protected).length,
-        words: readableNotes.reduce(
-          (total, note) => total + note.content.split(/\s+/).filter(Boolean).length,
-          0,
-        ),
+        words: readableNotes.reduce((total, note) => total + wordCount(note.content), 0),
         taskMemos: visibleNotes.filter((note) => taskStats(note.content).total > 0).length,
         scheduledMemos: visibleNotes.filter((note) => note.dueAt).length,
       },
@@ -1556,83 +1378,26 @@ export default function Home() {
             : null;
         if (!payload || !Array.isArray(payload.notes)) throw new Error();
         const usedIds = new Set(notes.map((note) => note.id));
-        const isDate = (value: unknown): value is string =>
-          typeof value === "string" && !Number.isNaN(Date.parse(value));
-        const imported = payload.notes.map((raw): Note | null => {
-          if (!raw || typeof raw !== "object") return null;
-          const item = raw as Partial<Note>;
-          if (typeof item.title !== "string" || !item.title.trim()) return null;
-          const id =
-            typeof item.id === "string" && item.id.trim() && !usedIds.has(item.id)
-              ? item.id
-              : crypto.randomUUID();
+        const takeId = (candidate?: string) => {
+          const id = candidate && !usedIds.has(candidate) ? candidate : crypto.randomUUID();
           usedIds.add(id);
-          const now = new Date().toISOString();
-          const createdAt = isDate(item.createdAt)
-            ? item.createdAt
-            : isDate(item.updatedAt)
-              ? item.updatedAt
-              : now;
-          const updatedAt = isDate(item.updatedAt) ? item.updatedAt : createdAt;
-          const tags = Array.isArray(item.tags)
-            ? Array.from(
-                new Set(
-                  item.tags
-                    .filter((tag): tag is string => typeof tag === "string")
-                    .map(normalizeTag)
-                    .filter(Boolean),
-                ),
-              ).slice(0, 50)
-            : ["inbox"];
-          const protectedMemo = item.protected === true;
-          const colors = ["yellow", "blue", "purple", "green", "orange"];
-          const color = typeof item.color === "string" && colors.includes(item.color) ? item.color : "yellow";
-          return {
-            id,
-            title: item.title.trim().slice(0, 500),
-            content: protectedMemo
-              ? ""
-              : typeof item.content === "string"
-                ? item.content.slice(0, 10000000)
-                : "",
-            tags: tags.length ? tags : ["inbox"],
-            folder:
-              typeof item.folder === "string" && item.folder.trim()
-                ? item.folder.trim().slice(0, 100)
-                : "inbox",
-            dueAt: isDate(item.dueAt) ? new Date(item.dueAt).toISOString() : undefined,
-            createdAt,
-            updatedAt,
-            favorite: item.favorite === true,
-            archived: item.archived === true,
-            pinned: item.pinned === true,
-            deleted: false,
-            protected: protectedMemo,
-            encryptedContent:
-              typeof item.encryptedContent === "string"
-                ? item.encryptedContent.slice(0, 12000000)
-                : undefined,
-            recoveryEncryptedContent:
-              typeof item.recoveryEncryptedContent === "string"
-                ? item.recoveryEncryptedContent.slice(0, 12000000)
-                : undefined,
-            color,
-          };
-        });
-        if (imported.some((item) => item === null)) throw new Error();
+          return id;
+        };
+        const imported = payload.notes.map((raw) => coerceImportedNote(raw, takeId));
+        if (imported.some((item) => item === null)) throw new Error("unreadable memo in backup");
         const normalizedNotes = imported as Note[];
         const nextNotes = [...normalizedNotes, ...notes];
         setNotes(nextNotes);
-        persistToApi(nextNotes);
+        persistWorkspace(nextNotes);
         const importedFolders = Array.isArray(payload.folders)
           ? payload.folders
               .filter((folder): folder is string => typeof folder === "string" && !!folder.trim())
-              .map((folder) => folder.trim().toLowerCase().replace(/\s+/g, "-").slice(0, 100))
-              .slice(0, 100)
+              .map((folder) => folder.trim().toLowerCase().replace(/\s+/g, "-").slice(0, limits.folder))
+              .slice(0, limits.customFolders)
           : [];
         const nextFolders = Array.from(new Set([...customFolders, ...importedFolders]));
         setCustomFolders(nextFolders);
-        localStorage.setItem("memo-folders", JSON.stringify(nextFolders));
+        writeJson("memo-folders", nextFolders);
         const importedSearches = Array.isArray(payload.savedSearches)
           ? payload.savedSearches
               .filter(
@@ -1653,9 +1418,9 @@ export default function Home() {
           ...importedSearches.filter(
             (saved) => !savedSearches.some((current) => current.query === saved.query),
           ),
-        ].slice(0, 100);
+        ].slice(0, limits.savedSearches);
         setSavedSearches(nextSearches);
-        localStorage.setItem("memo-saved-searches", JSON.stringify(nextSearches));
+        writeJson("memo-saved-searches", nextSearches);
         const importedTemplates = Array.isArray(payload.templates)
           ? payload.templates
               .filter(
@@ -1681,20 +1446,16 @@ export default function Home() {
                         .filter(Boolean)
                         .slice(0, 20)
                     : ["inbox"],
-                  color:
-                    typeof item.color === "string" &&
-                    ["yellow", "blue", "purple", "green", "orange"].includes(item.color)
-                      ? item.color
-                      : "yellow",
-                  content: item.content!.slice(0, 100000),
+                  color: isNoteColor(item.color) ? item.color : "yellow",
+                  content: item.content!.slice(0, limits.templateContent),
                   custom: true,
                 };
               })
-              .slice(0, 30)
+              .slice(0, limits.customTemplates)
           : [];
-        const nextTemplates = [...customTemplates, ...importedTemplates].slice(-30);
+        const nextTemplates = [...customTemplates, ...importedTemplates].slice(-limits.customTemplates);
         setCustomTemplates(nextTemplates);
-        localStorage.setItem("memo-templates", JSON.stringify(nextTemplates));
+        writeJson("memo-templates", nextTemplates);
         notify(normalizedNotes.length + " memos and workspace views imported");
       } catch {
         notify("That file is not a Memo export");
@@ -1708,7 +1469,7 @@ export default function Home() {
       notify("Choose an image file");
       return;
     }
-    if (file.size > 2 * 1024 * 1024) {
+    if (file.size > limits.image) {
       notify("Images must be under 2 MB");
       return;
     }
@@ -1747,6 +1508,10 @@ export default function Home() {
   }
   function requestProtection() {
     if (!active) return;
+    if (!canProtectMemos()) {
+      notify("This browser cannot encrypt memos. Open the app over HTTPS to protect them.");
+      return;
+    }
     setPasswordMode(active.protected ? "unprotect" : "protect");
     setPasswordPrompt(active);
     setPasswordValue("");
@@ -1775,7 +1540,7 @@ export default function Home() {
             : note,
         );
         setNotes(nextNotes);
-        persistToApi(nextNotes);
+        persistWorkspace(nextNotes);
         setRecoveryNotice(recoveryCode);
         notify("Memo protected");
       } else {
@@ -1792,7 +1557,7 @@ export default function Home() {
             : note,
         );
         setNotes(nextNotes);
-        persistToApi(nextNotes);
+        persistWorkspace(nextNotes);
         notify("Memo protection removed");
       }
       setPasswordPrompt(null);
@@ -1820,7 +1585,7 @@ export default function Home() {
           : note,
       );
       setNotes(nextNotes);
-      persistToApi(nextNotes);
+      persistWorkspace(nextNotes);
       setActiveId(recoveryPrompt.id);
       setRecoveryPrompt(null);
       setPasswordValue("");
@@ -1863,6 +1628,25 @@ export default function Home() {
   useEffect(() => {
     if (filter === "upcoming") setSort("due");
   }, [filter]);
+  const syncStatus =
+    syncState === "saving"
+      ? { label: "Saving", hint: "Writing your latest change" }
+      : syncState === "offline"
+        ? { label: "Offline", hint: "Saved on this device. Select to retry sync." }
+        : syncTarget === "server"
+          ? { label: "Synced", hint: "Saved to your database" }
+          : syncTarget === "locked"
+            ? { label: "On this device", hint: "Add a sync passphrase in settings" }
+            : { label: "On this device", hint: "Memos never leave this browser" };
+  useEffect(() => {
+    let cancelled = false;
+    void storageEstimate().then((value) => {
+      if (!cancelled) setStorageUsage(value);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [settingsOpen, notes.length]);
   const commandActions = [
     {
       id: "new",
@@ -2305,30 +2089,23 @@ export default function Home() {
           </button>
           <button
             className={`sync-card ${syncState === "offline" ? "sync-offline" : ""}`}
-            onClick={retrySync}
-            title={syncState === "offline" ? "Retry database sync" : "Save current workspace"}
+            onClick={() => void retrySync()}
+            title={syncStatus.hint}
           >
             <div className="sync-icon">
-              {syncState === "offline" ? <MoreHorizontal size={14} /> : <Check size={14} />}
+              {syncState === "saved" ? <Check size={14} /> : <MoreHorizontal size={14} />}
             </div>
             <div>
-              <strong>
-                {syncState === "saving"
-                  ? "Saving locally"
-                  : syncState === "offline"
-                    ? "Offline mode"
-                    : "Saved locally"}
-              </strong>
-              <span>{syncState === "offline" ? "Click to retry database sync" : "Ready for sync later"}</span>
+              <strong>{syncStatus.label}</strong>
+              <span>{syncStatus.hint}</span>
             </div>
             <MoreHorizontal size={16} />
           </button>
-          <button className="user-row" onClick={() => notify("Account settings coming with Clerk")}>
-            {" "}
-            <div className="avatar">R</div>
+          <button className="user-row" onClick={() => setSettingsOpen(true)}>
+            <div className="avatar">M</div>
             <div>
-              <strong>Rafi’s workspace</strong>
-              <span>Local workspace</span>
+              <strong>Your workspace</strong>
+              <span>{storageUsage ? `${formatBytes(storageUsage.usage)} stored` : "Private to you"}</span>
             </div>
             <ChevronDown size={15} />
           </button>
@@ -2780,7 +2557,7 @@ export default function Home() {
                                   : item,
                               );
                               setNotes(nextNotes);
-                              persistToApi(nextNotes);
+                              persistWorkspace(nextNotes);
                             }}
                             aria-label="Toggle favorite"
                           >
@@ -2869,18 +2646,8 @@ export default function Home() {
                 className={`save-status ${syncState === "offline" ? "save-offline" : syncState === "saving" ? "save-pending" : ""}`}
                 aria-live="polite"
               >
-                {syncState === "saving" ? (
-                  <MoreHorizontal size={14} />
-                ) : syncState === "offline" ? (
-                  <MoreHorizontal size={14} />
-                ) : (
-                  <Check size={14} />
-                )}{" "}
-                {syncState === "saving"
-                  ? "Saving locally…"
-                  : syncState === "offline"
-                    ? "Offline — retry from sidebar"
-                    : "Saved locally"}
+                {syncState === "saved" ? <Check size={14} /> : <MoreHorizontal size={14} />}{" "}
+                {syncState === "saving" ? "Saving…" : syncStatus.label}
               </span>
               <div>
                 <button
@@ -3844,10 +3611,59 @@ export default function Home() {
               </span>
               <input type="checkbox" checked={dark} onChange={(e) => setDark(e.target.checked)} />
             </label>
+            {syncTarget !== "device" && (
+              <div className="settings-group settings-stack">
+                <span>Sync passphrase</span>
+                <p className="settings-hint">
+                  This deployment has a shared database. Enter its passphrase to keep memos in sync across
+                  your devices, or leave it empty to keep this workspace in this browser only.
+                </p>
+                <div className="settings-row">
+                  <input
+                    type="password"
+                    value={passphraseInput}
+                    onChange={(e) => setPassphraseInput(e.target.value)}
+                    placeholder="Sync passphrase"
+                    aria-label="Sync passphrase"
+                    autoComplete="off"
+                  />
+                  <button className="settings-done" onClick={() => void applyPassphrase()}>
+                    Connect
+                  </button>
+                </div>
+              </div>
+            )}
+            <div className="settings-group settings-stack">
+              <span>Storage on this device</span>
+              <p className="settings-hint">
+                {storageUsage && storageUsage.quota
+                  ? `${formatBytes(storageUsage.usage)} used of roughly ${formatBytes(storageUsage.quota)} available to this site.`
+                  : "This browser does not report how much space is left."}
+              </p>
+              <div className="settings-row">
+                <button onClick={() => exportNotes()}>Export a backup</button>
+                <button className="settings-danger" onClick={() => void forgetDeviceWorkspace()}>
+                  Remove memos from this device
+                </button>
+              </div>
+            </div>
             <button className="settings-done" onClick={() => setSettingsOpen(false)}>
               Done
             </button>
           </section>
+        </div>
+      )}
+      {storageNotice && (
+        <div className="storage-notice" role="status">
+          <span>{storageNotice}</span>
+          <button onClick={() => exportNotes()}>Export backup</button>
+          <button
+            className="icon-btn"
+            onClick={() => setStorageNotice("")}
+            aria-label="Dismiss storage warning"
+          >
+            <X size={15} />
+          </button>
         </div>
       )}
       {toast && (
@@ -3859,7 +3675,7 @@ export default function Home() {
       {editorOpen && active && (
         <div className="editor-color-fab" role="group" aria-label="Memo color">
           <span>Color</span>
-          {["yellow", "blue", "purple", "green", "orange"].map((color) => (
+          {noteColors.map((color) => (
             <button
               key={color}
               className={`color-dot ${color} ${active.color === color ? "active" : ""}`}
