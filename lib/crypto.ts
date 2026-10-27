@@ -42,13 +42,9 @@ export const makeRecoveryCode = () => {
 };
 
 async function deriveKey(password: string, salt: Uint8Array, iterations: number) {
-  const material = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(password),
-    "PBKDF2",
-    false,
-    ["deriveKey"],
-  );
+  const material = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, [
+    "deriveKey",
+  ]);
   return crypto.subtle.deriveKey(
     { name: "PBKDF2", salt: salt as BufferSource, iterations, hash: "SHA-256" },
     material,
